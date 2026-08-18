@@ -1,0 +1,337 @@
+/*****************************************************************************
+*                       Copyright (c)
+*              Avon Building Solutions Pvt Ltd
+*                   All RIGTHS RESERVED.
+*
+* Module Name	: group_config.c
+* Created By	: Harshit Agnihotri.
+* Created Date	: 28/11/2023.
+* Module
+* Description	:
+*
+* Controller	: 	ATSAM4E16CA-AUR
+*				1024 KB		Flash.
+*				128 KB		RAM.
+*
+* REVISION HISTORY
+* Version		: 1.0
+* Revision Date: 28/11/2023.
+* Changes		: NA.
+*****************************************************************************/
+
+/***** System Includes *****/
+#include "asf.h"
+
+/***** User Includes *****/
+#include "group_config.h"
+#include "string.h"
+#include "user_uart.h"
+#include "definitions.h"
+#include "comn_config.h"
+#include "app_osdp.h"
+#include "app_utility.h"
+
+// Declare and initialize the MfgInfo structure with constant values.
+Mfg_Info MfgInfo=
+{
+     .fw_vs="R1.3",
+     .hw_vs="R1.0",
+     .ip_addr="192.168.001.045",
+     .door_ctrllrs=0x10,
+     .grps=0x08,
+     .ips_en=0x06,
+     .ops_en=0x04
+};
+
+//Declare Group_Info structure array variable to store the group information of all the groups.
+Group_Info Group[MAX_GROUPS];
+
+/*****************************************************************************
+* Function name: void Read_Manufacturing_Info(U8* read_mfg_info).
+* Returns		: nothing.
+* Arguments    : U8* read_mfg_info.
+* Created by	: Harshit Agnihotri.
+* Date created	: 28/11/2023.
+*
+* Description	: Function to read manufacturing information and copy it to a buffer.
+*              :
+* Notes	     : NA.
+* Global Variables Affected : NA.
+*****************************************************************************/
+void Read_Manufacturing_Info(U8* read_mfg_info)
+{
+	//Update_Manufacturing_Info();
+	
+     strcpy((char*)read_mfg_info, MfgInfo.fw_vs);                               // Copy manufacturing information data to the read_mfg_info array.
+     strcpy((char*)(read_mfg_info + FW_VS_BYTES), MfgInfo.hw_vs);
+     strcpy((char*)(read_mfg_info + FW_VS_BYTES + HW_VS_BYTES), MfgInfo.ip_addr);
+     read_mfg_info[FW_VS_BYTES + HW_VS_BYTES + IP_ADDR_BYTES]=MfgInfo.door_ctrllrs;
+     read_mfg_info[FW_VS_BYTES + HW_VS_BYTES + IP_ADDR_BYTES + 1]=MfgInfo.grps;
+     read_mfg_info[FW_VS_BYTES + HW_VS_BYTES + IP_ADDR_BYTES + 2]=MfgInfo.ips_en;
+     read_mfg_info[FW_VS_BYTES + HW_VS_BYTES + IP_ADDR_BYTES + 3]=MfgInfo.ops_en;
+}
+
+/*****************************************************************************
+* Function name: void test_read_mfg_info(void).
+* Returns		: nothing.
+* Arguments    : none.
+* Created by	: Harshit Agnihotri.
+* Date created	: 29/11/2023.
+*
+* Description	: This function tests the Read_Manufacturing_Info function.
+*              :
+* Notes	     : NA.
+* Global Variables Affected : NA.
+*****************************************************************************/
+void test_read_mfg_info(void)
+{
+     #if (TEST_READ_MFG_INF0==uDISABLE)
+     U8 mfg_info[MFG_INFO_BYTES];
+     Read_Manufacturing_Info(mfg_info);                     // Test the function Read_Manufacturing_Info.
+     Send_Frame_On_UART(mfg_info, MFG_INFO_BYTES);
+     #endif
+}
+
+/*****************************************************************************
+* Function name: void write_group_configuration(U8* received_group_data, U8 group_no).
+* Returns		: nothing.
+* Arguments    : U8* received_group_data, U8 group_no.
+* Created by	: Harshit Agnihotri.
+* Date created	: 30/11/2023.
+*
+* Description	: This function parses received group configuration data and write it into Group_Info structure array variable.
+*              :
+* Notes	     : NA.
+* Global Variables Affected : Group.
+*****************************************************************************/
+void write_group_configuration(U8* received_group_data, U8 group_no)
+{
+     U16 received_data_index = 0;
+     U8 group_index = group_no - 1;
+
+     Group[group_index].group_number = received_group_data[received_data_index++];// Parse and write the group number.
+
+     U8 lc_doors_in_grp_lb = 0x00;
+     U8 lc_doors_in_grp_hb = 0x00;
+	 
+
+     for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)                  // Parse and write the doors that are enabled in group.
+     {
+          if(received_group_data[received_data_index++])
+          SET_BIT (&lc_doors_in_grp_lb, no_of_bit);                             // Set the bit equivalent to door number that is enabled.
+     }
+     for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)
+     {
+          if(received_group_data[received_data_index++])
+          SET_BIT(&lc_doors_in_grp_hb, no_of_bit);                              // Set the bit equivalent to door number that is enabled.
+     }
+     Group[group_index].doors_in_grp_lb = lc_doors_in_grp_lb;
+     Group[group_index].doors_in_grp_hb = lc_doors_in_grp_hb;
+
+
+     U8 lc_ips_in_grp = 0x00;
+     for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)                  // Parse and write the inputs that are enabled in group including emergency and fire.
+     {
+          if(received_group_data[received_data_index++])
+          SET_BIT(&lc_ips_in_grp, no_of_bit);                                   // Set the bit equivalent to input number that is enabled including emergency and fire.
+     }
+     Group[group_index].ips_in_grp = lc_ips_in_grp;
+
+
+     for(U8 no_of_door = 0; no_of_door < MAX_DOORS; no_of_door++)               // Parse and write the interlocking sequence of each door.
+     {
+          Group[group_index].door[no_of_door].itd_hb = received_group_data[received_data_index++];// Parse and write the interlocking time delay of respective door.
+          Group[group_index].door[no_of_door].itd_lb = received_group_data[received_data_index++];
+
+
+          Group[group_index].door[no_of_door].slave_addr = received_group_data[received_data_index++];// Parse and write the slave address of respective door.
+
+
+          U8 lc_ils_door_lb = 0x00;
+          U8 lc_ils_door_hb = 0x00;
+          for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)             // Parse and write the interlocking sequence of respective door with other doors.
+          {
+               if(received_group_data[received_data_index++])
+               SET_BIT(&lc_ils_door_lb, no_of_bit);                             // Set the bit equivalent to door number that is in interlocking with respective door.
+          }
+          for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)
+          {
+               if(received_group_data[received_data_index++])
+               SET_BIT(&lc_ils_door_hb, no_of_bit);                             // Set the bit equivalent to door number that is in interlocking with respective door.
+          }
+          Group[group_index].door[no_of_door].ils_door_lb = lc_ils_door_lb;
+          Group[group_index].door[no_of_door].ils_door_hb = lc_ils_door_hb;
+     }
+
+
+	for(U8 no_of_input = 0; no_of_input < MAX_INPUTS; no_of_input ++)          // Parse and write the interlocking sequence of each input.
+	{
+		U8 lc_ils_ips_lb = 0x00;
+		U8 lc_ils_ips_hb = 0x00;
+		for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)             // Parse and write the interlocking sequence of respective input with other doors.
+		{
+			if(received_group_data[received_data_index++])
+			SET_BIT(&lc_ils_ips_lb, no_of_bit);                              // Set the bit equivalent to door number that is in interlocking with respective input.
+		}
+		for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)
+		{
+			if(received_group_data[received_data_index++])
+			SET_BIT(&lc_ils_ips_hb, no_of_bit);                              // Set the bit equivalent to door number that is in interlocking with respective input.
+        }
+		Group[group_index].input[no_of_input].ils_ips_lb = lc_ils_ips_lb;
+		Group[group_index].input[no_of_input].ils_ips_hb = lc_ils_ips_hb;
+	}
+}
+
+
+
+/*****************************************************************************
+* Function name: void read_group_configuration(U8* read_group_data, U8 group_no).
+* Returns		: nothing.
+* Arguments    : U8* read_group_data, U8 group_no.
+* Created by	: Harshit Agnihotri.
+* Date created	: 1/12/2023.
+*
+* Description	: This function reads and passes the group configuration data.
+*              :
+* Notes	     : NA.
+* Global Variables Affected : NA.
+*****************************************************************************/
+void read_group_configuration(U8* read_group_data, U8 group_no)
+{
+     U16 read_data_index=0;
+     U8 group_index = group_no - 1;
+
+     read_group_data[read_data_index++] = Group[group_index].group_number;      // Read and pass group number.
+
+
+     for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)                  // Read and pass the doors that are enabled in group.
+     {
+          if(IS_BIT_SET(Group[group_index].doors_in_grp_lb, no_of_bit))         // Check if bit equivalent to door number is set.
+          read_group_data[read_data_index++] = 0x01;                            // If bit equivalent to door number is set pass 0x01.
+          else
+          read_group_data[read_data_index++] = 0x00;                            // If bit equivalent to door number is not set pass 0x00.
+     }
+     for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)
+     {
+          if(IS_BIT_SET(Group[group_index].doors_in_grp_hb, no_of_bit))         // Check if bit equivalent to door number is set.
+          read_group_data[read_data_index++] = 0x01;                            // If bit equivalent to door number is set pass 0x01.
+          else
+          read_group_data[read_data_index++] = 0x00;                            // If bit equivalent to door number is not set pass 0x00.
+     }
+
+
+     for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)                  // Read and pass the inputs that are enabled in group.
+     {
+          if(IS_BIT_SET(Group[group_index].ips_in_grp, no_of_bit))              // Check if bit equivalent to input number is set.
+          read_group_data[read_data_index++] = 0x01;                            // If bit equivalent to input number is set pass 0x01.
+          else
+          read_group_data[read_data_index++] = 0x00;                            // If bit equivalent to input number is not set pass 0x00.
+     }
+
+
+     for(U8 no_of_door = 0; no_of_door < MAX_DOORS; no_of_door++)               // Read and pass the interlocking sequence of each door.
+     {
+
+          read_group_data[read_data_index++] = Group[group_index].door[no_of_door].itd_hb;// Read and pass the interlocking time delay of respective door.
+          read_group_data[read_data_index++] = Group[group_index].door[no_of_door].itd_lb;
+
+
+          read_group_data[read_data_index++] = Group[group_index].door[no_of_door].slave_addr;// Read and pass the slave address of respective door.
+
+
+          U8 lc_ils_door_lb = Group[group_index].door[no_of_door].ils_door_lb;
+          U8 lc_ils_door_hb = Group[group_index].door[no_of_door].ils_door_hb;
+          for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)             // Read and pass the interlocking sequence of respective door with other doors.
+          {
+               if(IS_BIT_SET(lc_ils_door_lb, no_of_bit))                        // Check if bit equivalent to door number that is in interlocking with respective door is set.
+               read_group_data[read_data_index++] = 0x01;                       // If bit equivalent to door number that is in interlocking with respective door is set pass 0x01.
+               else
+               read_group_data[read_data_index++] = 0x00;                       // If bit equivalent to door number that is in interlocking with respective door is not set pass 0x00.
+          }
+          for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)
+          {
+               if(IS_BIT_SET(lc_ils_door_hb, no_of_bit))                        // Check if bit equivalent to door number that is in interlocking with respective door is set.
+               read_group_data[read_data_index++] = 0x01;                       // If bit equivalent to door number that is in interlocking with respective door is set pass 0x01.
+               else
+               read_group_data[read_data_index++] = 0x00;                       // If bit equivalent to door number that is in interlocking with respective door is not set pass 0x00.
+          }
+     }
+
+
+     for(U8 no_of_input = 0; no_of_input < MAX_INPUTS; no_of_input ++)          // Read and pass the interlocking sequence of respective door with other inputs.
+     {
+          U8 lc_ils_ips_lb = Group[group_index].input[no_of_input].ils_ips_lb;
+          U8 lc_ils_ips_hb = Group[group_index].input[no_of_input].ils_ips_hb;
+          for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)
+          {
+               if(IS_BIT_SET(lc_ils_ips_lb, no_of_bit))                         // Check if bit equivalent to input number that is in interlocking with respective door is set.
+               read_group_data[read_data_index++] = 0x01;                       // If bit equivalent to input number that is in interlocking with respective door is set pass 0x01.
+               else
+               read_group_data[read_data_index++] = 0x00;                       // If bit equivalent to input number that is in interlocking with respective door is not set pass 0x00.
+          }
+          for(U8 no_of_bit = 0; no_of_bit < BYTE_SIZE; no_of_bit++)
+          {
+               if(IS_BIT_SET(lc_ils_ips_hb, no_of_bit))                         // Check if bit equivalent to input number that is in interlocking with respective door is set.
+               read_group_data[read_data_index++] = 0x01;                       // If bit equivalent to input number that is in interlocking with respective door is set pass 0x01.
+               else
+               read_group_data[read_data_index++] = 0x00;                       // If bit equivalent to input number that is in interlocking with respective door is not set pass 0x00.
+          }
+     }
+}
+
+/*****************************************************************************
+* Function name: void test_group_config(void).
+* Returns		: nothing.
+* Arguments    : none.
+* Created by	: Harshit Agnihotri.
+* Date created	: 02/12/2023.
+*
+* Description	: This function tests write_group_configuration and read_group_configuration functions.
+*              :
+* Notes	     : NA.
+* Global Variables Affected : NA.
+*****************************************************************************/
+void test_group_config(void)
+{
+     #if (TEST_GROUP_CONFIG == uDISABLE)
+     U8 received_group_data[MAX_GRP_BYTES] = {0x01,    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                                                       0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x3B, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+                                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+                                             };
+
+     U8 read_group_data[MAX_GRP_BYTES];
+
+
+     write_group_configuration(received_group_data, received_group_data[0]);    // Test the function write_group_configuration.
+
+
+     read_group_configuration(read_group_data, 1);                              // Test the function read_group_configuration.
+
+
+     Send_Frame_On_UART(read_group_data, MAX_GRP_BYTES);
+     #endif
+}

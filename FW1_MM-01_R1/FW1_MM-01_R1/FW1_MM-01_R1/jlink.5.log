@@ -1,0 +1,232 @@
+T315C 1291:038.438   SEGGER J-Link V7.52a Log File
+T315C 1291:038.646   DLL Compiled: Jul 28 2021 11:08:12
+T315C 1291:038.757   Logging started @ 2025-08-20 13:23
+T315C 1291:038.867 - 196180.048ms
+T315C 1291:055.743 JLINK_ExecCommand("Device = ATSAM4E16C", ...). 
+T315C 1291:057.019   Device "ATSAM4E16C" selected.
+T315C 1291:058.526 - 2.565ms returns 0x00
+T315C 1291:105.015 JLINK_TIF_Select(JLINKARM_TIF_SWD)
+T315C 1291:106.386 - 1.556ms returns 0x00
+T315C 1291:106.746 JLINK_SetSpeed(4000)
+T315C 1291:107.159 - 0.575ms
+T315C 1291:107.491 JLINK_ResetPullsRESET(OFF)
+T315C 1291:107.772 - 0.420ms
+T315C 1291:108.062 JLINK_Connect()
+T315C 1291:109.289   Found SW-DP with ID 0x2BA01477
+T315C 1291:112.616   DPIDR: 0x2BA01477
+T315C 1291:113.211   Scanning AP map to find all available APs
+T315C 1291:113.789   AP[1]: Stopped AP scan as end of AP map has been reached
+T315C 1291:113.972   AP[0]: AHB-AP (IDR: 0x24770011)
+T315C 1291:114.194   Iterating through AP map to find AHB-AP to use
+T315C 1291:114.869   AP[0]: Core found
+T315C 1291:115.045   AP[0]: AHB-AP ROM base: 0xE00FF000
+T315C 1291:115.469   CPUID register: 0x410FC241. Implementer code: 0x41 (ARM)
+T315C 1291:115.744   Found Cortex-M4 r0p1, Little endian.
+T315C 1291:217.087   -- Max. mem block: 0x00004E78
+T315C 1291:217.905   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T315C 1291:218.719   CPU_WriteMem(4 bytes @ 0xE000EDF0)
+T315C 1291:219.549   CPU_ReadMem(4 bytes @ 0xE0002000)
+T315C 1291:220.473   FPUnit: 6 code (BP) slots and 2 literal slots
+T315C 1291:220.902   CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T315C 1291:221.582   CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T315C 1291:222.304   CPU_ReadMem(4 bytes @ 0xE0001000)
+T315C 1291:223.133   CPU_WriteMem(4 bytes @ 0xE0001000)
+T315C 1291:223.946   CPU_ReadMem(4 bytes @ 0xE000ED88)
+T315C 1291:224.783   CPU_WriteMem(4 bytes @ 0xE000ED88)
+T315C 1291:225.620   CPU_ReadMem(4 bytes @ 0xE000ED88)
+T315C 1291:226.424   CPU_WriteMem(4 bytes @ 0xE000ED88)
+T315C 1291:227.336   CoreSight components:
+T315C 1291:227.773   ROMTbl[0] @ E00FF000
+T315C 1291:228.133   CPU_ReadMem(64 bytes @ 0xE00FF000)
+T315C 1291:229.091   CPU_ReadMem(32 bytes @ 0xE000EFE0)
+T315C 1291:230.046   ROMTbl[0][0]: E000E000, CID: B105E00D, PID: 000BB00C SCS-M7
+T315C 1291:230.430   CPU_ReadMem(32 bytes @ 0xE0001FE0)
+T315C 1291:231.377   ROMTbl[0][1]: E0001000, CID: B105E00D, PID: 003BB002 DWT
+T315C 1291:231.794   CPU_ReadMem(32 bytes @ 0xE0002FE0)
+T315C 1291:232.913   ROMTbl[0][2]: E0002000, CID: B105E00D, PID: 002BB003 FPB
+T315C 1291:233.316   CPU_ReadMem(32 bytes @ 0xE0000FE0)
+T315C 1291:234.259   ROMTbl[0][3]: E0000000, CID: B105E00D, PID: 003BB001 ITM
+T315C 1291:234.721   CPU_ReadMem(32 bytes @ 0xE0040FE0)
+T315C 1291:235.757   ROMTbl[0][4]: E0040000, CID: B105900D, PID: 000BB9A1 TPIU
+T315C 1291:236.134 - 128.162ms returns 0x00
+T315C 1291:236.501 JLINK_Halt()
+T315C 1291:239.544 - 3.174ms returns 0x00
+T315C 1291:240.104 JLINK_BeginDownload(Flags = 0x00000000)
+T315C 1291:240.389 - 0.401ms
+T315C 1291:240.700 JLINK_WriteMem(0x400E0A04, 0x4 Bytes, ...)
+T315C 1291:240.955   Data:  0B 01 00 5A
+T315C 1291:242.143   CPU_WriteMem(4 bytes @ 0x400E0A04)
+T315C 1291:242.961 - 2.377ms returns 0x4
+T315C 1291:243.299 JLINK_EndDownload()
+T315C 1291:243.520 - 0.355ms returns 0 (0x0)
+T315C 1291:243.826 JLINK_ReadMemHW(0x400E0A08, 0x0004 Bytes, ...)
+T315C 1291:244.126   CPU_ReadMem(4 bytes @ 0x400E0A08)
+T315C 1291:245.040   Data:  01 00 00 00
+T315C 1291:245.312 - 1.566ms returns 0
+T315C 1291:245.585 JLINK_SetResetType(JLINKARM_CM3_RESET_TYPE_NORMAL)
+T315C 1291:245.840 - 0.356ms returns JLINKARM_CM3_RESET_TYPE_NORMAL
+T315C 1291:246.048 JLINK_Reset()
+T315C 1291:246.711   CPU_ReadMem(16 bytes @ 0x20000000)
+T315C 1291:248.011   CPU_WriteMem(16 bytes @ 0x20000000)
+T315C 1291:248.871   CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T315C 1291:249.658   CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T315C 1291:250.428   CPU_ReadMem(4 bytes @ 0xE0001000)
+T315C 1291:265.536   CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T315C 1291:266.358   CPU_WriteMem(16 bytes @ 0x20000000)
+T315C 1291:270.041   CPU_WriteMem(4 bytes @ 0xE0002000)
+T315C 1291:271.062   CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T315C 1291:271.870   CPU_ReadMem(4 bytes @ 0xE0001000)
+T315C 1291:272.677 - 26.752ms
+T315C 1291:279.361 JLINK_JTAG_GetDeviceID(DeviceIndex = 0)
+T315C 1291:279.659 - 0.435ms returns 0
+T315C 1291:279.960 JLINK_ReadMemU32(0x400E0740, 0x1 Items)
+T315C 1291:280.253   CPU_ReadMem(4 bytes @ 0x400E0740)
+T315C 1291:281.121   Data:  E0 0C CC A3
+T315C 1291:281.532 - 1.698ms returns 1 (0x1)
+T315C 1291:281.925 JLINK_ReadMemU32(0x400E0744, 0x1 Items)
+T315C 1291:282.303   CPU_ReadMem(4 bytes @ 0x400E0744)
+T315C 1291:283.177   Data:  01 02 12 00
+T315C 1291:283.456 - 1.618ms returns 1 (0x1)
+T0B30 1291:286.617 JLINK_IsHalted()
+T0B30 1291:286.899 - 0.410ms returns TRUE
+T0B30 1291:287.179 JLINK_GetMOEs(...)
+T0B30 1291:287.445   CPU_ReadMem(4 bytes @ 0xE000ED30)
+T0B30 1291:288.256 - 1.221ms returns 0x01
+T0B30 1291:288.560 JLINK_ReadReg(R15 (PC))
+T0B30 1291:288.834 - 0.400ms returns 0xFFFFFFFE
+T0B30 1291:492.074 JLINK_IsHalted()
+T0B30 1291:492.215 - 0.193ms returns TRUE
+T315C 1291:625.851 JLINK_BeginDownload(Flags = 0x00000000)
+T315C 1291:625.999 - 0.204ms
+T315C 1291:626.158 JLINK_WriteMem(0x00400000, 0x4000 Bytes, ...)
+T315C 1291:626.309   Data:  E0 97 01 20 2D 0D 42 00 29 0D 42 00 29 0D 42 00 ...
+T315C 1291:627.575   completely In flash
+T315C 1291:627.792    -- Read from flash cache (16384 bytes @ 0x00400000)
+T315C 1291:627.948 - 1.840ms returns 0x4000
+T315C 1291:628.103 JLINK_WriteMem(0x00404000, 0x3AC6C Bytes, ...)
+T315C 1291:628.258   Data:  88 A0 01 E0 00 BF 01 35 AE B2 40 46 B8 47 86 42 ...
+T315C 1291:628.999   completely In flash
+T315C 1291:629.983    -- Read from flash cache (240748 bytes @ 0x00404000)
+T315C 1291:630.216 - 2.166ms returns 0x3AC6C
+T315C 1291:630.697 JLINK_WriteMem(0x0043EC6C, 0x8 Bytes, ...)
+T315C 1291:630.839   Data:  68 2D FF 7F 01 00 00 00
+T315C 1291:631.083   completely In flash
+T315C 1291:631.258 - 0.610ms returns 0x8
+T315C 1291:631.641 JLINK_WriteMem(0x0043EC74, 0xB7C Bytes, ...)
+T315C 1291:631.788   Data:  BF F3 5F 8F 01 38 FB D1 70 47 00 00 FF FF FF FF ...
+T315C 1291:632.037   completely In flash
+T315C 1291:632.220    -- Read from flash cache (2940 bytes @ 0x0043EC74)
+T315C 1291:632.368 - 0.778ms returns 0xB7C
+T0B30 1291:692.338 JLINK_IsHalted()
+T0B30 1291:692.432 - 0.126ms returns TRUE
+T0B30 1291:893.444 JLINK_IsHalted()
+T0B30 1291:894.150 - 0.841ms returns TRUE
+T315C 1291:897.185 JLINK_EndDownload()
+T315C 1291:898.003   CPU_ReadMem(4 bytes @ 0xE000ED90)
+T315C 1291:898.815   CPU_ReadMem(4 bytes @ 0xE000ED94)
+T315C 1291:899.640    -- --------------------------------------
+T315C 1291:900.116   Flash bank @ 0x00400000: Default: L2 verify disabled because algorithm performs L1 verify
+T315C 1291:900.531    -- Start of determining dirty areas in flash cache
+T315C 1291:902.325    -- End of determining dirty areas
+T315C 1291:902.754    -- Start of preparing flash programming
+T315C 1291:903.181    -- Calculating RAM usage
+T315C 1291:903.624    -- RAM usage = 10020 Bytes
+T315C 1291:904.076    -- Preserving CPU registers
+T315C 1291:904.556    -- Preparing memory
+T315C 1291:904.916    -- Preparing target
+T315C 1292:064.163    -- Preserving target RAM temporarily used for programming
+T315C 1292:099.289    -- Downloading RAMCode
+T315C 1292:111.056    -- Preparing RAMCode
+T315C 1292:115.782    -- Checking target RAM
+T315C 1292:118.091    -- End of preparing flash programming
+T315C 1292:119.670   Looking for J-Link GUI Server exe at: C:\Program Files (x86)\Atmel\Studio\7.0\atbackend\JLinkGUIServer.exe
+T315C 1292:121.095   Looking for J-Link GUI Server exe at: \JLinkGUIServer.exe
+T315C 1292:422.154   Failed to connect to J-Link GUI Server.
+T315C 1292:485.313    -- CPU is running at 90000 kHz.
+T315C 1292:485.593    -- Start of comparing flash
+T315C 1292:485.836    -- CRC check was estimated as fastest method
+T315C 1292:486.093    -- Comparing range 0x400000 - 0x41FFFF (32 Sectors, 128 KiB), using multi-block CRC calculation
+T315C 1292:498.501    -- CRC does not match for sectors 0-31
+T315C 1292:498.960    -- Comparing range 0x420000 - 0x43FFFF (32 Sectors, 128 KiB), using multi-block CRC calculation
+T315C 1292:510.835    -- CRC does not match for sectors 0-31
+T315C 1292:511.050    -- End of comparing flash
+T315C 1292:511.222    -- Start of erasing sectors
+T315C 1292:511.392    -- End of erasing sectors
+T315C 1292:511.561    -- Start of flash programming
+T315C 1292:511.734    -- Programming range 0x00400000 - 0x00407FFF (  8 Sectors, 32 KB)
+T315C 1292:620.801    -- Programming range 0x00408000 - 0x0040FFFF (  8 Sectors, 32 KB)
+T315C 1292:746.025    -- Programming range 0x00410000 - 0x00417FFF (  8 Sectors, 32 KB)
+T315C 1292:873.398    -- Programming range 0x00418000 - 0x0041FFFF (  8 Sectors, 32 KB)
+T315C 1292:990.929    -- Programming range 0x00420000 - 0x00427FFF (  8 Sectors, 32 KB)
+T315C 1293:121.355    -- Programming range 0x00428000 - 0x0042FFFF (  8 Sectors, 32 KB)
+T315C 1293:245.688    -- Programming range 0x00430000 - 0x00437FFF (  8 Sectors, 32 KB)
+T315C 1293:370.211    -- Programming range 0x00438000 - 0x0043FFFF (  8 Sectors, 32 KB)
+T315C 1293:495.403    -- End of flash programming
+T315C 1293:496.022    -- 0x400000 - 0x43FFFF ( 64 Sectors, 256 KoB)
+T315C 1293:496.437    -- Start of restoring
+T315C 1293:496.803    -- Restoring RAMCode
+T315C 1293:521.233    -- Restoring target memory
+T315C 1293:554.735    -- Restore target
+T315C 1293:606.533    -- Restore memory
+T315C 1293:606.874    -- Restoring CPU registers
+T315C 1293:607.198    -- End of restoring
+T315C 1293:607.607    -- Bank 0 @ 0x00400000: 1 range affected (262144 bytes)
+T315C 1293:608.177    -- Total: 1.704s (Prepare: 0.582s, Compare: 0.025s, Erase: 0.000s, Program & Verify: 1.006s, Restore: 0.089s)
+T315C 1293:608.709    -- Program & Verify speed: 254 KiB/s
+T315C 1293:617.045 - 1720.056ms returns 262144 (0x40000)
+T315C 1293:618.219 JLINK_ResetPullsRESET(ON)
+T315C 1293:618.585 - 0.528ms
+T315C 1293:618.924 JLINK_ResetNoHalt()
+T315C 1293:620.455   Found SW-DP with ID 0x2BA01477
+T315C 1293:623.359   DPIDR: 0x2BA01477
+T315C 1293:623.917   AP map detection skipped. Manually configured AP map found.
+T315C 1293:624.434   AP[0]: AHB-AP (IDR: Not set)
+T315C 1293:625.829   AP[0]: Core found
+T315C 1293:626.377   AP[0]: AHB-AP ROM base: 0xE00FF000
+T315C 1293:627.271   CPUID register: 0x410FC241. Implementer code: 0x41 (ARM)
+T315C 1293:627.823   Found Cortex-M4 r0p1, Little endian.
+T315C 1293:729.493   -- Max. mem block: 0x00004B48
+T315C 1293:729.853   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T315C 1293:730.614   CPU_ReadMem(4 bytes @ 0xE0002000)
+T315C 1293:731.541   FPUnit: 6 code (BP) slots and 2 literal slots
+T315C 1293:731.984   CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T315C 1293:732.787   CPU_ReadMem(4 bytes @ 0xE0001000)
+T315C 1293:733.646   CPU_ReadMem(4 bytes @ 0xE000ED88)
+T315C 1293:734.463   CPU_WriteMem(4 bytes @ 0xE000ED88)
+T315C 1293:735.256   CPU_ReadMem(4 bytes @ 0xE000ED88)
+T315C 1293:735.994   CPU_WriteMem(4 bytes @ 0xE000ED88)
+T315C 1293:737.184   CoreSight components:
+T315C 1293:738.025   ROMTbl[0] @ E00FF000
+T315C 1293:738.655   CPU_ReadMem(64 bytes @ 0xE00FF000)
+T315C 1293:740.348   CPU_ReadMem(32 bytes @ 0xE000EFE0)
+T315C 1293:741.629   ROMTbl[0][0]: E000E000, CID: B105E00D, PID: 000BB00C SCS-M7
+T315C 1293:742.088   CPU_WriteMem(4 bytes @ 0xE0001000)
+T315C 1293:742.940   CPU_ReadMem(32 bytes @ 0xE0001FE0)
+T315C 1293:744.150   ROMTbl[0][1]: E0001000, CID: B105E00D, PID: 003BB002 DWT
+T315C 1293:744.574   CPU_ReadMem(32 bytes @ 0xE0002FE0)
+T315C 1293:745.599   ROMTbl[0][2]: E0002000, CID: B105E00D, PID: 002BB003 FPB
+T315C 1293:746.124   CPU_ReadMem(32 bytes @ 0xE0000FE0)
+T315C 1293:747.231   ROMTbl[0][3]: E0000000, CID: B105E00D, PID: 003BB001 ITM
+T315C 1293:747.681   CPU_ReadMem(32 bytes @ 0xE0040FE0)
+T315C 1293:748.801   ROMTbl[0][4]: E0040000, CID: B105900D, PID: 000BB9A1 TPIU
+T315C 1293:749.349   JLINK_Reset()
+T315C 1293:750.098     CPU_ReadMem(16 bytes @ 0x20000000)
+T315C 1293:750.910     CPU_WriteMem(16 bytes @ 0x20000000)
+T315C 1293:751.754     CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T315C 1293:752.542     CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T315C 1293:753.327     CPU_ReadMem(4 bytes @ 0xE0001000)
+T315C 1293:769.546     CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T315C 1293:770.668     CPU_WriteMem(16 bytes @ 0x20000000)
+T315C 1293:774.481     CPU_WriteMem(4 bytes @ 0xE0002000)
+T315C 1293:775.350     CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T315C 1293:776.165     CPU_ReadMem(4 bytes @ 0xE0001000)
+T315C 1293:776.981   - 27.754ms
+T315C 1293:777.220   JLINK_Go()
+T315C 1293:777.419     CPU_ReadMem(4 bytes @ 0xE0001000)
+T315C 1293:778.206     CPU_WriteMem(4 bytes @ 0xE0001004)
+T315C 1293:779.550   - 2.489ms
+T315C 1293:779.844 - 161.046ms
+T315C 1293:793.399 JLINK_Close()
+T315C 1293:825.071 - 31.853ms
+T315C 1293:825.386   
+T315C 1293:825.924   Closed

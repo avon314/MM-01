@@ -1,0 +1,33 @@
+/*****************************************************************************
+*                       Copyright (c)
+*              Avon Building Solutions Pvt Ltd
+*                   All RIGTHS RESERVED.
+*
+* Module Name	: door_config.h
+* Created By	: Harshit Agnihotri.
+* Created Date	: 04/03/2024.
+* Module
+* Description	: Header file for door_config.c.
+		       Defines constants and macros for door_config.c.
+*
+* REVISION HISTORY
+* Version		: 1.0
+* Revision Date: 04/03/2024.
+* Changes		: NA.
+*****************************************************************************/
+
+
+#ifndef DOOR_CONFIG_H_
+#define DOOR_CONFIG_H_
+
+#define MAX_DOORS (16)
+#define TEST_DOOR_CONFIG (1)
+
+extern volatile U8 door_osdp_id[MAX_DOORS];    // Array variable that holds the osdp id for 16 doors.
+
+/***** Function Declarations / Prototypes *****/
+void write_door_config(U8*);
+void read_door_config(U8*);
+void test_door_config(void);
+
+#endif /* DOOR_CONFIG_H_ */

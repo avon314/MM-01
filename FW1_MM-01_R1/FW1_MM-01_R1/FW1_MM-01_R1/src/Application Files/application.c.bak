@@ -1,0 +1,256 @@
+/*****************************************************************************
+*                       Copyright (c)
+*              Avon Building Solutions Pvt Ltd
+*                   All RIGTHS RESERVED.
+*
+* Module Name	: application.c
+* Created By	: Ranjitkumar Ainapure.
+* Created Date	: 18/08/2023.
+* Module
+* Description	:
+*
+* Controller	: 	ATSAM4E16CA-AUR
+*					1024 KB		Flash.
+*128 KB		RAM.
+*
+* REVISION HISTORY
+* Version		: 1.0
+* Revision Date	: 18/08/2023.
+* Changes		: NA.
+*****************************************************************************/
+
+/***** User defined Includes *****/
+#include "application.h"
+#include "user_uart.h"
+#include "rs485_uart.h"
+#include "rs485_driver.h"
+#include "user_rtos.h"
+#include "digital_input.h"
+#include "relay_output.h"
+#include "test_code.h"
+#include "osdp_protocol_master.h"
+#include "user_timer.h"
+#include "led_operation.h"
+#include "onboard_key.h"
+#include "config_mode.h"
+#include "ext_eeprom.h"
+
+/**************************************/
+#include "ethernet.h"
+//#include "task_defs.h"
+#include "tcp_server.h"
+#include "general_application.h"
+#include <user_rtc.h>
+#include "mem.h"
+#include "string.h"
+#include "memory_storage.h"
+
+xSemaphoreHandle xMutex1;
+
+U8 gb_tm_cnt_f = 0;
+U16 gb_srh_count = 0;
+
+/***** External RAM Section *****/
+#include "user_spi.h"
+#include "ext_eeprom_1.h"
+ 
+
+#include "CRC.h"
+#include "cJSON.h"
+#include "acs_control_functionality.h"
+#include "ext_eeprom_1.h"
+#include "area_implementation.h"
+
+void Calculate_ExtRam_Time(void);
+
+// #define ext_ram __attribute__((section("ext_ram")))
+// 
+// ext_ram uint32_t myArray[1000]; // Define an array of 1000 uint32_t (4 bytes each)
+// ext_ram uint32_t myArray1[2000];
+// ext_ram U8 myChoice;
+// ext_ram U8 myChoice1;
+//U8 myChoice __attribute__((section(".ext_ram_section")));
+//U8 myChoice1 __attribute__((section(".ext_ram_section")));
+
+/***** End of External RAM Section *****/
+
+/*****************************************************************************
+* Function name	: void Driver_Initialization(void)
+* Returns		: nothing.
+* Arguments    	: None.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 18/08/2023.
+*
+* Description	:	All the drivers all initialized here.
+*               :
+* Notes			: NA
+* Global Variables Affected : NA.
+*****************************************************************************/
+void Driver_Initialization(void)
+{
+	wdt_disable(WDT);				/* Disable WDT at power on */
+	UART_Debug_Init();				/* Initialization of UART0 for debug communication. */
+	Configure_Onboard_Key();		/* Configure port pin as an input and interrupt edge for inputs. */
+	Configure_LED_PortPins();		/* Configure port pins for leds. */
+	Timer_Init();					/* Configure timer to generate an interrupt at every 1 ms. */
+	Digital_Input_Driver_Init();	/* Configure port pins as an input and interrupt edge for inputs. */
+	Relay_Output_Driver_Init();		/* Configure port pins as an output & enable pull ups. */
+	RS485_UART_Init();				/* Initialization of USART0 for RS485 communication. */
+	RS485_Driver_Init();			/* Initialization of RS485 Driver. */
+	configure_twi();                /* Configure twi(i2c) to write data to eeprom. */
+	eeprom_pin_config();            /* Configure pin used for eeprom write protect. */
+	//Read_MacID_And_Update_InSystem();	/* Read MAC ID and update the default one. */
+	
+	configure_spi_master();
+	RTC_Interrupt_Pin_Configure();
+	
+	EXT_EEPROM_Init();
+	enter_config_mode();
+	
+	U8 arr[512] = {0};
+	memset(arr, 0, 512);
+	
+	// OC Clear actual area counts.
+	//EEPROM_Page_Write(AOC_EEP_START_PAGE, 0, arr, 22);
+		
+	//OD_TIME_EEP_SRT_PG
+// 	EEPROM_Page_Write(2592, 0, arr, 512);
+// 	delay_ms(10);
+// 	EEPROM_Page_Write(2593, 0, arr, 512);	//OD_TIME_EEP_SRT_PG
+// 	delay_ms(10);
+// 	EEPROM_Page_Write(2594, 0, arr, 512);	//OD_TIME_EEP_SRT_PG
+	
+	//CA_USR_EEP_SRT_PG		(2754)
+	//EEPROM_Page_Write(2754, 0, arr, 512);	//OD_TIME_EEP_SRT_PG
+// 	delay_ms(10);
+// 	EEPROM_Page_Write(2755, 0, arr, 512);	//OD_TIME_EEP_SRT_PG
+// 	delay_ms(10);
+// 	EEPROM_Page_Write(2756, 0, arr, 512);	//OD_TIME_EEP_SRT_PG
+	
+	// Clear Area definition
+// 	EEPROM_Page_Write(AD_EEP_START_PAGE, 0, arr, 512);
+// 	// Clear area antipass back flags.
+// 	for (U8 idx = 0; idx < 58; idx ++)
+// 	{
+// 		EEPROM_Page_Write(AP_EEP_START_PAGE+idx, 0, arr, 512);
+// 		delay_ms(10);
+// 	}
+
+	// Erase DC data.
+	//EEPROM_Page_Erase(DC_EEP_START_PAGE);
+	
+	//EEPROM_Chip_Erase();
+	Read_Memory_For_PowerON_State();
+	init_ethernet();				/* Configure the Ethernet driver */
+	//Configure_WDT();				/* Configure 3 sec's of WDT timer to prevent the software stuck. */
+
+	// Update transaction log.
+// 	void Flash_Store_Transaction_Log(int user_id, U8 *csn_data, U8 *day_date, U8 *time_arr,
+// 	U8 reader_id, U8 door_num, U8 door_side, U8 status, U8 reason, U8 *purpose_code)
+	
+// 	U8 csn_data[7] = {0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 0xAA};
+// 	U8 date[4] = {4, 7, 25, 6};
+// 	U8 time_arr[3] = {11, 12, 13};
+// 	for (U8 store = 0 ;store < 10; store ++)
+// 	{
+// 		Flash_Store_Transaction_Log(100000 + store, csn_data, date, time_arr, 16, 16, 1, 1, 99, 0);
+// 	}
+	
+// 	for (U8 lcl = 0; lcl < 12; lcl ++)
+// 	{
+// 		gb_actual_occup[lcl] = 0;
+// 	}
+	
+	
+// 	EEPROM_Page_Write(0, 0, array, 5);
+// 	delay_ms(100);
+// 	memset(array, 0, 5);
+// 	EEPROM_Page_Read(0, 0, array, 5);
+// 	Print_Data_On_Uart(array, 5);
+	
+	
+	
+	//Erase_Credential_Holder_Info_From_EEP();
+
+/*	
+	U8 csn_array[16];
+	memset(csn_array, 255, 16);
+	U8 csn_array1[16] = {0, 0, 0, 90, 1, 2, 3, 0, 0, 0, 0, 0, 0xAA, 0x74, 0xA0, 0};	// 65
+	U8 csn_array2[16] = {0, 0, 0, 121, 4, 5, 6, 0, 0, 0, 0, 0, 0xA5, 0x73, 0x80, 0};
+	U8 csn_array3[16] = {0, 0, 0, 153, 7, 8, 9, 0, 0, 0, 0, 0, 0xAB, 0x43, 0x60, 0};
+		
+	for (int idx = CSN_EEP_START_LOC; idx < CSN_EEP_END_LOC; idx += CD_CSN_SIZE_1USER)
+	{
+		if (idx == CSN_EEP_START_LOC)
+		{
+			Print_Message("\nidx value is : ");
+			Print_Number(idx);
+			
+			//EEPROM_Byte_Write(idx, csn_array1, CD_CSN_SIZE_1USER);
+		}
+// 		else if (idx == (CSN_EEP_START_LOC + (16 * 999)))
+// 		{
+// 			Print_Message("\nidx value is : ");
+// 			Print_Number(idx);
+// 			
+// 			EEPROM_Byte_Write(idx, csn_array2, CD_CSN_SIZE_1USER);
+// 		}
+		else if (idx == (CSN_EEP_END_LOC - 15))
+		{
+			Print_Message("\nidx value is : ");
+			Print_Number(idx);
+			
+			EEPROM_Byte_Write(idx, csn_array3, CD_CSN_SIZE_1USER);
+		}
+		else
+		{
+			//EEPROM_Byte_Write(idx, csn_array, CD_CSN_SIZE_1USER);
+		}
+	}
+*/	
+	
+	// Erase DA info.
+ 	//EEPROM_Page_Erase(DA_EEP_START_PAGE);
+// 	EEPROM_Page_Erase(1320);
+// 	EEPROM_Page_Erase(1321);
+	/******** Test purpose write to flash ***********/
+// 	U8 arr[5] = {0};
+// 	EEPROM_Byte_Write(TL_STORED_LAST_ADDS, arr, 5);
+	/******** Test purpose write to flash ***********/
+	#if (DEBUG_ALL || DEBUG_APP)
+	Print_Message("\nWelcome! Access Control System.\n\n");
+	#endif
+	//Erase_DA_Data_For_User(5);
+	
+// 	Operate_Relay(1, ON);
+// 	Operate_Relay(2, ON);
+// 	Operate_Relay(3, ON);
+// 	Operate_Relay(4, ON);
+	//Calculate_ExtRam_Time();
+}
+
+
+
+
+/*****************************************************************************
+* Function name	: void Run_RTOS(void)
+* Returns		: nothing.
+* Arguments    	: None.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 23/08/2023.
+*
+* Description	:	Create tasks, semaphores, mutexes and set priority
+*					and run scheduler.
+*               :
+* Notes			: NA
+* Global Variables Affected : NA.
+*****************************************************************************/
+void Run_RTOS(void)
+{
+	Create_TCP_Server_Task();
+	Create_Tasks();		// Create tasks and set priority.
+	Create_Binary_Semaphore();		// Create Binary Semaphore to access shared resource or synchronization.
+
+	/* Start the scheduler. */
+	vTaskStartScheduler();
+}

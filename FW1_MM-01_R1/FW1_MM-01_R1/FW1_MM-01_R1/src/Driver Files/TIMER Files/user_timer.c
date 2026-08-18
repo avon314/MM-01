@@ -1,0 +1,397 @@
+/*****************************************************************************
+*                       Copyright (c)
+*              Avon Building Solutions Pvt Ltd
+*                   All RIGTHS RESERVED.
+*
+* Module Name	: user_timer.c
+* Created By	: Ranjitkumar Ainapure.
+* Created Date	: 30/10/2022.
+* Module
+* Description	:	Initialization of timer module, ISR initialized for 1 ms.
+*
+* Controller	: 	ATSAM4S8B
+*					512 KB		Flash.
+*					128 KB		RAM.
+*
+* REVISION HISTORY
+* Version		: 1.0
+* Revision Date	: 30/10/2022.
+* Changes		: NA.
+*****************************************************************************/
+#include "asf.h"
+#include "user_timer.h"
+#include "definitions.h"
+#include "user_uart.h"
+#include "config_mode.h"
+#include "group_config.h"
+#include "onboard_key.h"
+#include "Modbus.h"
+#include "modbus_app.h"
+#include "mm_app.h"
+#include "input_output.h"
+
+/***** Local variables *****/
+volatile uint16_t ms = 0;
+volatile uint16_t sec = 0;
+
+/***** Global variables *****/
+volatile uint8_t gb_timer_f = 0;
+volatile U16 delay_counts = 0;			// Variable used to generate delay using timer interrupt.
+
+/* Boot loader variables */
+volatile uint16_t jsec = 0;
+U8 gb_boot_jump_start_timer = 0 ;
+
+extern U16 gb_srh_count;
+extern U8 gb_tm_cnt_f;
+extern U8 gb_arm_timer_f;
+extern U16 gb_arm_counter;
+extern U8 gb_arm_exceed_f;
+
+/***** Extern Function Declarations *****/
+extern void RS485IntercharDelayError(void);
+
+/*****************************************************************************
+* Function name	: void Timer_Init(void)
+* Returns		: Nothing.
+* Arguments    	: None.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 30/10/2022.
+*
+*
+* Description	:	Initialization of timer 0 module. and interrupt generaton
+*					at every 1 ms.
+*               :
+* Notes			: NA
+* Global Variables Affected : NA.
+*****************************************************************************/
+void Timer_Init(void)
+{
+	tc_enable_interrupt(TC0, 0, TC_IER_CPCS);	//	Enable channel 0 timer interrupt on compare match value for TC0
+	Timer_config(1000);
+}
+
+/*****************************************************************************
+* Function name	: void Timer_config(uint32_t freq_desired1)
+* Returns		: Nothing.
+* Arguments    	: uint32_t freq_desired1 ---> Pass desired frequency.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 30/10/2022.
+*
+*
+* Description	:	Configuration of timer 0 module and interrupt priority of that.
+*               :
+* Notes			: NA
+* Global Variables Affected : NA.
+*****************************************************************************/
+void Timer_config(uint32_t freq_desired1)
+{
+	uint32_t counts1;
+	uint32_t ul_div1;
+	uint32_t ul_tcclks1;
+	uint32_t ul_sysclk = sysclk_get_cpu_hz();			// read Master clock and store into local var
+
+	pmc_enable_periph_clk(ID_TC0);						// enable Peripheral  clock for TC0
+
+	// Configure TC for a desired frequency and trigger on RC compare on channel 1.
+	tc_find_mck_divisor(
+	(uint32_t)freq_desired1,							// The desired frequency as a uint32.
+	ul_sysclk,											// Master clock freq in Hz.
+	&ul_div1,											// Pointer to register where divisor will be stored.
+	&ul_tcclks1,										// Pointer to reg where clock selection number is stored.
+	ul_sysclk);											// Board clock freq in Hz.
+
+	tc_init(TC0, 0, ul_tcclks1 | TC_CMR_CPCTRG);			// initialize TC for 1msec delay
+
+
+	// Find the best estimate of counts, then write it to TC register C channel 0.
+	counts1 = (ul_sysclk/ul_div1)/freq_desired1;		// calculate count for TC register c channel0
+	tc_write_rc(TC0, 0, counts1);
+
+	// Enable interrupts for this TC, and start the TC.
+	tc_enable_interrupt(TC0, 0, TC_IER_CPCS);			// Enable interrupt for TC0 compare capture.
+
+	tc_start(TC0, 0);									// Start TC0.
+	irq_register_handler(TC0_IRQn, 1);
+}
+
+
+
+
+/*****************************************************************************
+* Function name	: void Configure_WDT(void)
+* Returns		: void.
+* Arguments    	: None.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 01/04/2023.
+*
+*
+* Description	:	Configure WDT. for 3 seconds.
+					And set reset time to 2 seconds.
+*               :
+* Notes			: NA
+* Global Variables Affected : gb_delay_time.
+*****************************************************************************/
+void Configure_WDT(void)
+{
+ 	uint32_t wdt_mode;
+ 	U32 timeout_value;
+ 	
+ 	/* Get timeout value. */
+ 	timeout_value = wdt_get_timeout_value(WDT_PERIOD * 1000, BOARD_FREQ_SLCK_XTAL);
+//  	Print_Message("\nWDT timeout value : ");
+// 	Print_Number(timeout_value);
+ 	if (timeout_value == WDT_INVALID_ARGUMENT)
+ 	{
+ 		while (1)
+ 		{
+ 			/* Invalid timeout value, error. */
+ 			//printf("Invalid Timeout Value.\n");
+ 		}
+ 	}
+ 	
+ 	/* Configure WDT to trigger an interrupt (or reset). */
+ 	wdt_mode = WDT_MR_WDFIEN |  /* Enable WDT fault interrupt. */
+ 	WDT_MR_WDRSTEN |			/* Watchdog Reset Enable */
+ 	WDT_MR_WDRPROC;			/* WDT fault resets processor only. */
+ 	//WDT_MR_WDDBGHLT  |  /* WDT stops in debug state. */
+ 	//WDT_MR_WDIDLEHLT; /* WDT stops in idle state. */
+ 	
+	pmc_enable_periph_clk(ID_WDT);
+ 	/* Initialize WDT with the given parameters. */
+ 	wdt_init(WDT, wdt_mode, timeout_value, timeout_value);
+ 
+ 	/* Configure and enable WDT interrupt. */
+ 	NVIC_DisableIRQ(WDT_IRQn);
+ 	NVIC_ClearPendingIRQ(WDT_IRQn);
+ 	NVIC_SetPriority(WDT_IRQn, 0);
+ 	NVIC_EnableIRQ(WDT_IRQn);
+}
+
+/*****************************************************************************
+* Function name	: void WDT_Handler(void)
+* Returns		: Nothing.
+* Arguments    	: void.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 01/04/2023.
+*
+*
+* Description	:	Interrupt service routine of WDT (Watchdog).
+*               :
+* Notes			: NA
+* Global Variables Affected : NA.
+*****************************************************************************/
+void WDT_Handler(void)
+{
+	/* Clear status bit to acknowledge interrupt by dummy read. */
+	uint32_t val= wdt_get_status(WDT);
+	/* Restart the WDT counter. */
+	//wdt_restart(WDT);
+}
+
+/*****************************************************************************
+* Function name	: void timer_delay(volatile U16 del)
+* Returns		: Nothing.
+* Arguments    	: volatile U16 del ---> Pass delay timer value in ms.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 03/02/2023.
+*
+*
+* Description	: Timer interrupt base delay will be generated by this function.
+*               :
+* Notes			: NA
+* Global Variables Affected : NA
+*****************************************************************************/
+void timer_delay(volatile U16 del)
+{
+	delay_counts = del;
+	while (delay_counts);
+}
+
+/*****************************************************************************
+* Function name	: void Decrement_Delay_Counts(void)
+* Returns		: Nothing.
+* Arguments    	: None.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 30/10/2022.
+* Description	: Decrements the delay counts.
+*               :
+* Notes			: Call in 1ms of timer ISR.
+* Global Variables Affected : NA.
+*****************************************************************************/
+void Decrement_Delay_Counts(void)
+{
+	if (delay_counts > 0)
+	{
+		delay_counts --;
+	}
+}
+
+/*****************************************************************************
+* Function name	: void Generate_General_Delay(void)
+* Returns		: Nothing.
+* Arguments    	: None.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 30/10/2022.
+* Description	: Function generates 1 secs of delay.
+*               :
+* Notes			: Call in 1ms of timer ISR.
+* Global Variables Affected : gb_timer_f ---> flag sets evry 1 sec.
+*****************************************************************************/
+void Generate_General_Delay(void)
+{
+	ms ++;
+	if (ms >= 1000)
+	{
+		ms = 0;
+		gb_timer_f = 1;
+		
+		if (gb_boot_jump_start_timer == 1)
+		{
+			jsec ++;
+		}
+	}
+}
+
+/*****************************************************************************
+* Function name	: void TC0_Handler(void)
+* Returns		: Nothing.
+* Arguments    	: None.
+* Created by	: Ranjitkumar Ainapure.
+* Date created	: 30/10/2022.
+*
+*
+* Description	:	Timer 0 interrupt service routine.
+*               :
+* Notes			: NA
+* Global Variables Affected : gb_timer_f ---> flag sets evry 1 sec.
+							  gb_captone_f ---> Flag used to generate tone for capsense.
+							  gb_poll_time ---> Decrement poll time. If sets zero fills with defined poll time.
+							  gb_poll_flag ---> sets the flag after poll time reaches zero.
+*****************************************************************************/
+extern int csnMS, csnMS_f;
+void TC0_Handler(void)
+{
+	volatile uint32_t status = tc_get_status(TC0, 0);
+	if ((status & TC_SR_CPCS) == TC_SR_CPCS)
+	{
+		if (csnMS_f)
+		{
+			csnMS ++;
+		}
+		
+		//RS485IntercharDelayError();	/* Flag sets if inter character delay exceeds. */
+		Generate_General_Delay();	    /* General 1 sec of timer flag set. */
+		Decrement_Delay_Counts();	    /* Decrements delay counts */
+		Modbus_Flags_Set_In_Timer();    /* Modbus inter character timer */
+
+	
+		
+		if (gb_config_mode_f)
+		{
+			if ((gb_config_timer_running_f) && (gb_exit_from_cfg_f != 1))
+			{
+				gb_config_timer++;            // Configuration mode timer.
+				gb_config_led_timer++;        // Configuration LED timer.
+			}
+			
+			if ((gb_config_rst_key_f) && (gb_cfg_mode_keyPressed == 2))
+			{
+				gb_config_rst_key_timer++;    // Configuration reset key timer.
+			}
+		}
+		
+		/***************** Timer for Modbus Poll frequency ****************************/
+			
+			if(mb_poll_dpt == 1)
+			{
+				mb_poll_timer++;
+							
+				if(mb_poll_timer >= ms_info.poll_interval)
+				{
+					mb_poll_timer = 0;
+					if(gb_retry_count == 0)
+					{
+						//Print_Message("\nPoll next DPT");
+						gb_send_mb_data = FLAG_SET;
+					}
+					else
+					{
+						/*Print_Message("\nWait for next DPT ");*/
+						gb_send_mb_data = FLAG_RST;
+					}
+				}
+			}
+	
+		/********************************************/
+		
+		/***** Timer for Default IP Setting *****/
+		if ((onb_key_flag.key_detect_f == FLAG_SET) && (onb_key_flag.start_timer_f == FLAG_SET))
+		{
+			onb_key_flag.timer_value ++;
+			if (onb_key_flag.timer_value >= DEFAULT_IP_TIME)
+			{
+				onb_key_flag.timer_value = 0;
+				onb_key_flag.start_timer_f = FLAG_RST;
+				onb_key_flag.key_set_for_default_ip = FLAG_SET;
+				onb_key_flag.led_off_f = FLAG_SET;
+			}
+		}
+		
+		if (onb_key_flag.key_set_for_default_ip == FLAG_SET)
+		{
+			static U16 led_counter;
+			
+			led_counter ++;
+			if ((led_counter >= DEFT_IP_LED_OFF_TIME) && (onb_key_flag.led_off_f == FLAG_SET))
+			{
+				led_counter = 0;
+				onb_key_flag.led_off_f = FLAG_RST;
+				onb_key_flag.led_on_f = FLAG_SET;
+			}
+			else if ((led_counter >= DEFT_IP_LED_ON_TIME) && (onb_key_flag.led_on_f == FLAG_SET))
+			{
+				led_counter = 0;
+				onb_key_flag.led_on_f = FLAG_RST;
+				onb_key_flag.led_off_f = FLAG_SET;
+			}
+		}
+		/***** End of Timer for Default IP Setting *****/
+		
+		
+		/**** timer for output activation ******/
+
+		for(U8 op = 0; op < MAX_OUTPUTS; op++)
+		{
+			if(gb_start_op_timer[op] == 1)
+			{
+				output_sec[op]++;
+
+				if(output_sec[op] >= (60 * 1000))
+				{			
+					output_sec[op] = 0;
+					output_min[op]++;
+				}
+			}
+		}	
+		/**** End of Timer for Output Activatio ******/
+		
+		if (gb_arm_timer_f == 1)
+		{
+			gb_arm_counter ++;
+			if (gb_arm_counter >= 500)
+			{
+				gb_arm_counter = 0;		// After 500 millisecs reset the counter.
+				gb_arm_timer_f = 0;		// And stop incrementing the counter.
+				gb_arm_exceed_f = 1;	// Set flag to indicate a pulse detected.
+			}
+			else
+			__NOP();
+		}
+		else
+		__NOP();
+		
+		if (gb_tm_cnt_f)
+		gb_srh_count ++;
+	}
+}

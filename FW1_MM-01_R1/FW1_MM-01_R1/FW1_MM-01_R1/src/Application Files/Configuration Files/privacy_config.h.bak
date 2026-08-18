@@ -1,0 +1,39 @@
+/*****************************************************************************
+*                       Copyright (c)
+*              Avon Building Solutions Pvt Ltd
+*                   All RIGTHS RESERVED.
+*
+* Module Name	: privacy_config.h
+* Created By	: Harshit Agnihotri.
+* Created Date	: 05/03/2024.
+* Module
+* Description	: Header file for privacy_config.c.
+		       Defines constants and macros for privacy_config.c.
+*
+* REVISION HISTORY
+* Version		: 1.0
+* Revision Date: 05/03/2024.
+* Changes		: NA.
+*****************************************************************************/
+
+#ifndef PRIVACY_CONFIG_H_
+#define PRIVACY_CONFIG_H_
+
+#define MAX_PVC_GRPS (8)
+#define MAX_DOORS (16)
+#define PVC_CONFIG_BYTES (MAX_DOORS * MAX_PVC_GRPS)
+#define TEST_PVC_GRP_CONFIG (1)
+
+#define SET_BIT(num, bitposition) ((*num) |= (1u << (bitposition)))
+#define CLEAR_BIT(num, bitposition)  ((*num) &= ~(1u << (bitposition)))
+#define IS_BIT_SET(num, bitposition)  (((num) & (1u << (bitposition))) != 0)
+
+/***** Variable that holds the information about each privacy group (group of doors that are included in privacy) *****/
+extern volatile U16 pvc_grp[MAX_PVC_GRPS];
+
+/***** Function Declarations / Prototypes *****/
+void write_pvc_grp_config(U8*);
+void read_pvc_grp_config(U8*);
+void test_pvc_grp_config(void);
+
+#endif /* PRIVACY_CONFIG_H_ */

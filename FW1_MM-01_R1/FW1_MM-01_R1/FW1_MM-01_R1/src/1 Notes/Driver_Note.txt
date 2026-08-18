@@ -1,0 +1,53 @@
+/*****************************************************************************
+*                       Copyright (c)
+*              Avon Building Solutions Pvt Ltd
+*                   All RIGTHS RESERVED.
+*
+* Module Name	: Driver_Note.txt
+* Created By	: Ranjitkumar Ainapure.
+* Created Date	: 22/08/2023.
+* Module
+* Description	:	Note regarding how to use drivers and variables defined in that.
+*
+* Controller	: 	ATSAM4E16CA-AUR
+*					1024 KB		Flash.
+*					128 KB		RAM.
+*
+* REVISION HISTORY
+* Version		: 1.0
+* Revision Date	: 22/08/2023.
+* Changes		: NA.
+*****************************************************************************/
+
+/*****************************************/
+/***** Use of UART for debug purpose *****/
+
+1) UART0 is configured in interrupt mode for TX and RX.
+2) Before sending a character, string or numbers on UART, programmer need to check "gb_uart_ready_f" flag variable is
+	set or not, if transmit buffer is empty this flag has set. No need to reset this flag because of internal reset.
+3) To print message/string use "Print_Message();" function.
+4) To print numbers use "Print_Number()" function.
+5) To print float values use "Print_Number_Float()" function.
+6) To print multiple characters/a string use "Send_Frame_On_UART()" function.
+7) To Get a character or 1 byte from the UART, check the flag variable "gb_uart_byte_rec_f". This flag has set when
+	1 byte is receive on UART (In Interrupt routine.).
+8) Then copy a character from "gb_uart_rec_byte" variable.
+9) Check "user_uart.h" and "user_uart.c" files for more details.
+10) Further programmer can write application related code.
+
+/***** End of UART for debug purpose *****/
+
+/******************************************/
+/***** Use of UART for RS485 protocol *****/
+
+1) USART1 is configured in interrupt mode for TX and RX.
+2) Before sending a character, string or numbers on USART1, programmer need to check "gb_usart_ready_f" flag variable is
+	set or not, if transmit buffer is empty this flag has set. No need to reset this flag because of internal reset.
+3) To send data on RS485 protocol use "Send_Data_RS485_UART()" function.
+4) To Get a character or 1 byte from the USART1, check the flag variable "gb_usart_byte_rec_f". This flag has set when
+	1 byte is receive on USART1 RX pin (In Interrupt routine.).
+5) Then copy a character from "gb_usart_rec_byte" variable.
+9) Check "rs485_uart.h" and "rs485_uart.c" files for more details.
+7) Further programmer can write application related code.
+
+/***** End of UART for RS485 protocol *****/

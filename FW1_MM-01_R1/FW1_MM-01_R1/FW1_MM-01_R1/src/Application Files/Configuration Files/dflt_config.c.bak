@@ -1,0 +1,200 @@
+/*****************************************************************************
+*                       Copyright (c)
+*              Avon Building Solutions Pvt Ltd
+*                   All RIGTHS RESERVED
+*
+* Module Name	: dflt_config.c
+* Created By	: Harshit Agnihotri
+* Created Date	: 05/04/2024
+* Module
+* Description	:
+*
+* Controller	: 	ATSAM4E16CA-AUR
+*					1024 KB		Flash
+*					128 KB		RAM
+*
+* REVISION HISTORY
+* Version		: 1.0
+* Revision Date: 05/04/2024
+* Changes		: NA
+/*****************************************************************************/
+
+ /* System Includes */
+ #include "asf.h"
+ #include "string.h"
+
+/* User Includes */
+ #include "dflt_config.h"
+ #include "definitions.h"
+ #include "group_config.h"
+ #include "input_config.h"
+ #include "output_config.h"
+ #include "door_config.h"
+ #include "privacy_config.h"
+ #include "comn_config.h"
+
+ /*****************************************************************************
+ * Function name: void write_dflt_grp_config(U8 grp_idx)
+ * Returns	 : None
+ * Arguments	 : U8 grp_idx
+ * Created by	 : Harshit Agnihotri
+ * Date created : 06-04-2024
+ * Description	 : Write the default configuration to group index passed.
+ *              :
+ * Notes		 : NA
+ * Global Variables Affected : Group
+ *****************************************************************************/
+ void write_dflt_grp_config(U8 grp_idx)
+ {
+      Group[grp_idx].group_number = 0x00;                                       // Write the default group number.
+
+      Group[grp_idx].doors_in_grp_lb = 0x00;                                    // Write the default doors activated in group.
+      Group[grp_idx].doors_in_grp_hb = 0x00;
+
+      Group[grp_idx].ips_in_grp = 0x00;                                         // Write the default inputs activated in group.
+
+      for(U8 no_of_door = 0; no_of_door < MAX_DOORS; no_of_door++)              // Write the interlocking sequence of each door.
+      {
+           Group[grp_idx].door[no_of_door].itd_hb = 0x00;                       // Write the default interlocking time delay for each door.
+           Group[grp_idx].door[no_of_door].itd_lb = 0x05;
+
+           Group[grp_idx].door[no_of_door].slave_addr = 0x00;                   // Write the default slave address for each door.
+
+           Group[grp_idx].door[no_of_door].ils_door_lb = 0x00;                  // Write the default interlocking sequence of doors.
+           Group[grp_idx].door[no_of_door].ils_door_hb = 0x00;
+
+           Group[grp_idx].door[no_of_door].ils_ips = 0x00;                      // Write the default interlocking sequence of inputs.
+      }
+ }
+
+ /*****************************************************************************
+ * Function name: void write_dflt_ip_config(void)
+ * Returns	 : None
+ * Arguments	 : None
+ * Created by	 : Harshit Agnihotri
+ * Date created : 06-04-2024
+ * Description	 : Write the default configuration to inputs.
+ *              :
+ * Notes		 : NA
+ * Global Variables Affected : gb_input
+ *****************************************************************************/
+void write_dflt_ip_config(void)
+{
+     for(U8 input_index = 0; input_index < MAX_INPUTS; input_index++)
+     {
+          gb_input[input_index].ip_en = 0x00;                                   // Write the default values for input.
+          gb_input[input_index].door_grp_number = 0x00;
+          gb_input[input_index].ip_for_interlock = 0x00;
+          gb_input[input_index].ip_activate_state = 0x00;
+          gb_input[input_index].ip_type = 0x00;
+          gb_input[input_index].ip_function = 0x00;
+     }
+}
+
+/*****************************************************************************
+ * Function name: void write_dflt_op_config(void)
+ * Returns	 : None
+ * Arguments	 : None
+ * Created by	 : Harshit Agnihotri
+ * Date created : 06-04-2024
+ * Description	 : Write the default configuration to outputs.
+ *              :
+ * Notes		 : NA
+ * Global Variables Affected : gb_output
+ *****************************************************************************/
+void write_dflt_op_config(void)
+{
+     for(U8 op_index = 0; op_index < MAX_OUTPUTS; op_index++)
+     {
+          gb_output[op_index].op_en = 0x00;                                     // Write the default values for output.
+          gb_output[op_index].door_number = 0x00;
+          gb_output[op_index].op_function = 0x00;
+          gb_output[op_index].op_type = 0x00;
+          gb_output[op_index].op_dflt_state = 0x00;
+     }
+}
+
+/*****************************************************************************
+ * Function name: void write_dflt_door_config(void)
+ * Returns	 : None
+ * Arguments	 : None
+ * Created by	 : Harshit Agnihotri
+ * Date created : 06-04-2024
+ * Description	 : Write the default configuration to doors.
+ *              :
+ * Notes		 : NA
+ * Global Variables Affected : door_osdp_id
+ *****************************************************************************/
+void write_dflt_door_config(void)
+{
+     for(U8 door_idx = 0; door_idx < MAX_DOORS; door_idx++)                     // Write the default values for door.
+     {
+          door_osdp_id[door_idx] = 0x00;
+     }
+}
+
+/*****************************************************************************
+ * Function name: void write_dflt_pvc_config(void)
+ * Returns	 : None
+ * Arguments	 : None
+ * Created by	 : Harshit Agnihotri
+ * Date created : 06-04-2024
+ * Description	 : Write the default configuration to privacy groups.
+ *              :
+ * Notes		 : NA
+ * Global Variables Affected : pvc_grp
+ *****************************************************************************/
+void write_dflt_pvc_config(void)
+{
+     for(U8 pvc_grp_idx = 0; pvc_grp_idx < MAX_PVC_GRPS; pvc_grp_idx++)         // Write the default values for privacy group.
+     {
+          for(U8 door_idx = 0; door_idx < MAX_DOORS; door_idx++)
+          {
+               CLEAR_BIT(&pvc_grp[pvc_grp_idx], door_idx);
+          }
+     }
+}
+
+/*****************************************************************************
+ * Function name: void write_dflt_comn_config(void)
+ * Returns	 : None
+ * Arguments	 : None
+ * Created by	 : Harshit Agnihotri
+ * Date created : 06-04-2024
+ * Description	 : Write the default configuration to communication settings.
+ *              :
+ * Notes		 : NA
+ * Global Variables Affected : IpAddr, Port_Num, SbntMsk, Dflt_Gtwy.
+ *****************************************************************************/
+void write_dflt_comn_config(void)
+{
+     strcpy(IpAddr.ip_addr_1, "192");                                           // Write the default values for ip address.
+     strcpy(IpAddr.ip_addr_2, "168");
+     strcpy(IpAddr.ip_addr_3, "001");
+     strcpy(IpAddr.ip_addr_4, "025");
+     IpAddr.ip_addr_1[3] = '\0';
+     IpAddr.ip_addr_2[3] = '\0';
+     IpAddr.ip_addr_3[3] = '\0';
+     IpAddr.ip_addr_4[3] = '\0';
+
+     strcpy(Port_Num, "00502");                                                 // Write the default values for port number.
+     Port_Num[5] = '\0';
+
+     strcpy(SbntMsk.sbnt_msk_1, "255");                                         // Write the default values for subnet mask.
+     strcpy(SbntMsk.sbnt_msk_2, "255");
+     strcpy(SbntMsk.sbnt_msk_3, "255");
+     strcpy(SbntMsk.sbnt_msk_4, "000");
+     SbntMsk.sbnt_msk_1[3] = '\0';
+     SbntMsk.sbnt_msk_2[3] = '\0';
+     SbntMsk.sbnt_msk_3[3] = '\0';
+     SbntMsk.sbnt_msk_4[3] = '\0';
+
+     strcpy(DfltGtwy.dflt_gtwy_1, "192");                                       // Write the default values for default gateway.
+     strcpy(DfltGtwy.dflt_gtwy_2, "168");
+     strcpy(DfltGtwy.dflt_gtwy_3, "001");
+     strcpy(DfltGtwy.dflt_gtwy_4, "001");
+     DfltGtwy.dflt_gtwy_1[3] = '\0';
+     DfltGtwy.dflt_gtwy_2[3] = '\0';
+     DfltGtwy.dflt_gtwy_3[3] = '\0';
+     DfltGtwy.dflt_gtwy_4[3] = '\0';
+}
