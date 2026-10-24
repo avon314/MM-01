@@ -238,6 +238,23 @@ void Extract_JsonData_Using_Frozen_Library(const char *json)
 			if (gb_send_cs_to_server == FLAG_SET)
 			{
 				gb_send_cs_to_server = FLAG_RST;
+
+				/* After power on, start Modbus exception (ME) checking only once slave scan is done and CS is sent */
+				if ((gb_start_sending_dpt == 1) && (gb_me_check_state == ME_CHECK_DISABLED))
+				{
+					gb_me_check_state = ME_CHECK_ARMED;
+				}
+				else
+				__NOP();
+			}
+			else
+			__NOP();
+
+			/* Clear ME only if the acknowledged frame carried the latest exception status */
+			if ((gb_send_me_to_server == FLAG_SET) && (gb_me_sent_cnt == gb_me_change_cnt))
+			{
+				gb_send_me_to_server = FLAG_RST;
+				memset(gb_mb_exc_clr, 0, TOTAL_SLAVES);	// Cleared slaves [SA,0] are acknowledged
 			}
 			else
 			__NOP();
@@ -1624,6 +1641,7 @@ const uint8_t* logEntries, U8 numEntries, char* jsonBuffer, U16 bufferSize)
 	const U8 is_1arr_size = 28;
  	const U8 md_1arr_size = 38;
 	const U8 cs_1arr_size = 63;
+	const U8 me_1arr_size = 152;	// "ME":[ + 16 x [16,255], + ],
 	const U8 erp_tm_size = 10;
 	const U8 op_1arr_size = 15;
 	const U8 as_frame_size = 10;
@@ -1900,6 +1918,66 @@ const uint8_t* logEntries, U8 numEntries, char* jsonBuffer, U16 bufferSize)
 		else
 		__NOP();
 		/* End of Create CS array */
+
+		/* Create ME (Modbus Exception) array : "ME":[[SA,EC],...], sent on change of value, cleared slave sent as [SA,0] */
+		if ((rem_bytes < me_1arr_size) && (gb_send_me_to_server == FLAG_SET))
+		{
+			lcl_frame_len_exceed_f = FLAG_SET;
+		}
+		else if (gb_send_me_to_server == FLAG_SET)
+		{
+			rem_bytes = (rem_bytes - me_1arr_size);
+		}
+		else
+		{
+			__NOP();
+		}
+
+		if ((gb_send_me_to_server == FLAG_SET) && (lcl_frame_len_exceed_f != FLAG_SET))
+		{
+			U8 lcl_me_status[TOTAL_SLAVES];
+			U8 lcl_me_clr[TOTAL_SLAVES];
+			U8 me_cnt = 0;
+
+			taskENTER_CRITICAL();	// Status is updated from Modbus task
+			memcpy(lcl_me_status, gb_mb_exc_status, TOTAL_SLAVES);
+			memcpy(lcl_me_clr, gb_mb_exc_clr, TOTAL_SLAVES);
+			gb_me_sent_cnt = gb_me_change_cnt;
+			taskEXIT_CRITICAL();
+
+			for (U8 idx = 0; idx < TOTAL_SLAVES; idx++)
+			{
+				if ((lcl_me_status[idx] != 0) || (lcl_me_clr[idx] == 1))	// Slave in exception [SA,EC] or cleared [SA,0]
+				{
+					lcl_data_len = strlen(lcl_data_buffer);
+					if (me_cnt == 0)
+					{
+						sprintf((lcl_data_buffer + lcl_data_len), "\"ME\":[");	// Add ME key before first entry
+						lcl_data_len = strlen(lcl_data_buffer);
+					}
+					else
+					__NOP();
+
+					sprintf((lcl_data_buffer + lcl_data_len), "[%d,%d],", (idx + 1), lcl_me_status[idx]);
+					me_cnt++;
+				}
+				else
+				__NOP();
+			}
+
+			/* Close ME array. Nothing to report -> ME key is not added. */
+			if (me_cnt > 0)
+			{
+				lcl_data_len = strlen(lcl_data_buffer);
+				lcl_data_buffer[lcl_data_len - 1] = ']';	// Replace last comma
+				lcl_data_buffer[lcl_data_len] = ',';
+			}
+			else
+			__NOP();
+		}
+		else
+		__NOP();
+		/* End of Create ME array */
 		
 		/* Send Output Status to server */
 		

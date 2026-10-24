@@ -24,7 +24,7 @@
 #include "frozen.h"
 
 
-#define DEBUG_JSON_EXT          (0)
+#define DEBUG_JSON_EXT          (1)
 
 
 typedef struct

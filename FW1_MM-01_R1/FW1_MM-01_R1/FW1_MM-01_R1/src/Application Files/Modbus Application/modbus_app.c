@@ -49,6 +49,14 @@ U8 gb_dpt_cycle_reset[TOTAL_SLAVES] = {1};
 extern xSemaphoreHandle xSemaphore;	
 volatile MB_OP_STATE modbus_op_state = MB_OP_NONE;	
 
+U8 gb_mb_exc_status[TOTAL_SLAVES] = {0};                                    // Exception code per slave reported to server ("ME"), 0 = no error
+static U8 gb_mb_exc_cycle[TOTAL_SLAVES] = {0};                              // Exception codes collected during the current DPT poll cycle
+U8 gb_mb_exc_clr[TOTAL_SLAVES] = {0};                                      // 1 = exception cleared, report [SA,0] until server ack
+U8 gb_send_me_to_server = 0;                                                // Flag to send "ME" to server, cleared on server ack
+volatile U8 gb_me_check_state = ME_CHECK_DISABLED;                         // ME checking state, enabled after CS frame is acknowledged
+U8 gb_me_change_cnt = 0;                                                    // Incremented on every change of gb_mb_exc_status
+U8 gb_me_sent_cnt = 0;                                                      // gb_me_change_cnt value carried in the last frame sent
+
 /**** End for Declaration for global variables ****/
 
 /*****************************************************************************
@@ -280,6 +288,7 @@ void Process_All_DPT_Packets(void)
 	{
 		current_dp_number = 1;                                              // Wrap back to first packet
 		memset(gb_dpt_cycle_reset, 1, MAX_INPUTS);                          // Set cycle reset flags for all slaves
+		Evaluate_Modbus_Exception_COV();                                    // Report "ME" to server if exception status changed
 	}
 }
 
@@ -386,6 +395,7 @@ void Modbus_Functionality_Task(void *pvParameters)
 				gb_device_power_on = FLAG_RST;                              // Reset the device power-on flag
 				
 				num_active_slaves = 0;                                      // Reset active slave counter
+				gb_me_check_state = ME_CHECK_DISABLED;                      // No ME checking until CS frame is sent after scan
 				memset(active_slaves, 0, sizeof(active_slaves));            // Clear active slaves array
 				slave_address = 1;                                          // Start scanning from slave address 1
 				gb_send_mb_data = FLAG_SET;                                 // Trigger first Modbus frame transmission
@@ -401,9 +411,10 @@ void Modbus_Functionality_Task(void *pvParameters)
 			}
 			send_frame();                                                   // Transmit Modbus frame if ready
 					
-			if ((gb_correct_frame_rcvd) && (gb_start_sending_dpt == 0) && (modbus_op_state == MB_OP_SCAN)) // Valid response received during scan
+			if ((gb_correct_frame_rcvd || gb_mb_exc_frame_rcvd) && (gb_start_sending_dpt == 0) && (modbus_op_state == MB_OP_SCAN)) // Valid response received during scan
 			{
 				gb_correct_frame_rcvd = 0;                                  // Clear frame received flag
+				gb_mb_exc_frame_rcvd = 0;                                   // Exception reply also means slave is present
 				active_slaves[slave_address - 1] = 1;                       // Mark current slave as active
 				num_active_slaves++;                                        // Increment active slave count
 				go_to_next_slave();                                         // Move to next slave address
@@ -447,6 +458,24 @@ void Modbus_Functionality_Task(void *pvParameters)
 				}
 			}
 			
+			if (gb_mb_exc_frame_rcvd == 1)                                  // Exception response received from slave
+			{
+				gb_mb_exc_frame_rcvd = 0;                                   // Clear exception received flag
+				switch (modbus_op_state)
+				{
+					case MB_OP_DPT_READ:                                    // Exception for data packet read
+					Record_Modbus_Exception(gb_mb_exc_slave, gb_mb_exc_code); // Collect for "ME" frame, do not store as DPT value
+					break;
+					case MB_OP_WRITE:                                       // Exception for write request, not reported in "ME"
+					mb_poll_dpt = 1;                                        // Resume polling after write
+					gb_mb_write_processing_f = 0;                           // Clear write processing flag
+					modbus_op_state = MB_OP_DPT_READ;                       // Return to DPT reading mode
+					break;
+					default:
+					break;
+				}
+			}
+
 			//Print_Message("\nxSemaphoreRelease.");				
 			/* Release the semaphore when done with the critical section */
 			xSemaphoreGive(xSemaphore);                                     // Release semaphore for other tasks
@@ -1278,4 +1307,111 @@ void Store_DPT_Into_Memory(uint8_t store_type, uint8_t *dpt_value)
 		break;
 	}
 }
-                                                                                                                          
+
+
+
+/*****************************************************************************
+ * Function name : Record_Modbus_Exception.
+ * Returns		 : void.
+ * Arguments     : U8 --> slave address, U8 --> exception code.
+ * Created by	 :
+ * Date created	 : 23/10/2026.
+ *
+ * Description	 : Collects the exception code returned by a slave during the
+ *                 current DPT poll cycle. Last exception of the cycle is kept.
+ *
+ * Notes	     : Reported to server by Evaluate_Modbus_Exception_COV().
+ * Global Variables Affected : gb_mb_exc_cycle
+ *****************************************************************************/
+void Record_Modbus_Exception(U8 slave_addr, U8 exc_code)
+{
+	if (gb_me_check_state != ME_CHECK_ACTIVE)                               // Not yet enabled after power on (CS frame not sent)
+	{
+		return;
+	}
+	
+	if ((slave_addr == 0) || (slave_addr > TOTAL_SLAVES) || (exc_code == 0)) // Validate slave address range and code
+	{
+		return;
+	}
+
+	#if (DEBUG_ALL || DEBUG_MB_EXC)
+	Print_Message("\nModbus exception, Slave : ");
+	Print_Number(slave_addr);
+	Print_Message(" Code : ");
+	Print_Number(exc_code);
+	#endif
+
+	gb_mb_exc_cycle[slave_addr - 1] = exc_code;                             // Store exception code for this slave
+}
+
+
+
+/*****************************************************************************
+ * Function name : Evaluate_Modbus_Exception_COV.
+ * Returns		 : void.
+ * Arguments     : nothing.
+ * Created by	 :
+ * Date created	 : 23/10/2026.
+ *
+ * Description	 : Called after every complete DPT poll cycle. Compares the
+ *                 exceptions collected in this cycle with the last reported
+ *                 status and requests an "ME" frame only on change of value.
+ *                 Slave whose exception is cleared is reported as [SA,0]
+ *                 until the server acknowledges it.
+ *
+ * Notes	     : After power on, checking starts with the first complete cycle
+ *                 after the CS frame is acknowledged by the server.
+ * Global Variables Affected : gb_mb_exc_status, gb_mb_exc_cycle, gb_mb_exc_clr,
+ *                             gb_send_me_to_server, gb_me_change_cnt
+ *****************************************************************************/
+void Evaluate_Modbus_Exception_COV(void)
+{
+	if (gb_me_check_state != ME_CHECK_ACTIVE)                               // Checking not active yet
+	{
+		if (gb_me_check_state == ME_CHECK_ARMED)                            // CS sent, start with next complete cycle
+		{
+			gb_me_check_state = ME_CHECK_ACTIVE;
+		}
+		else
+		{
+			__NOP();
+		}
+		memset(gb_mb_exc_cycle, 0, TOTAL_SLAVES);
+		return;
+	}
+	
+	if (memcmp(gb_mb_exc_cycle, gb_mb_exc_status, TOTAL_SLAVES) != 0)       // Change of value
+	{
+		taskENTER_CRITICAL();                                               // Frame is built from TCP task
+		for (U8 idx = 0; idx < TOTAL_SLAVES; idx++)
+		{
+			if (gb_mb_exc_cycle[idx] != 0)                                  // Slave in exception, reported with its code
+			{
+				gb_mb_exc_clr[idx] = 0;
+			}
+			else if (gb_mb_exc_status[idx] != 0)                             // Exception cleared
+			{
+				gb_mb_exc_clr[idx] = 1;                                     // Report as [SA,0]
+			}
+			else
+			{
+				__NOP();
+			}
+		}
+		memcpy(gb_mb_exc_status, gb_mb_exc_cycle, TOTAL_SLAVES);            // Update reported status
+		gb_me_change_cnt++;                                                 // Mark new status to be acknowledged
+		gb_send_me_to_server = FLAG_SET;                                    // Send "ME" in next frame
+		taskEXIT_CRITICAL();
+
+		#if (DEBUG_ALL || DEBUG_MB_EXC)
+		Print_Message("\nModbus exception status changed, send ME");
+		#endif
+	}
+	else
+	{
+		__NOP();
+	}
+
+	memset(gb_mb_exc_cycle, 0, TOTAL_SLAVES);                               // Start collecting for next cycle
+}

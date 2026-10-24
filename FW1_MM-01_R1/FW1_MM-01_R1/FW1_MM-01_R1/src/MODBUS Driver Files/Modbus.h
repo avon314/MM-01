@@ -53,6 +53,9 @@ extern volatile uint8_t gb_send_frame;					// Var used in Modbus sending frame a
 
 extern volatile uint8_t gb_retry_count;					// Var used as retry counter
 extern volatile uint8_t gb_correct_frame_rcvd;			// Var used for correct response of the frame used in application for further processing
+extern volatile uint8_t gb_mb_exc_frame_rcvd;			// Set when a valid exception response (FC | 0x80) is received from slave
+extern volatile uint8_t gb_mb_exc_slave;				// Slave address of the last exception response
+extern volatile uint8_t gb_mb_exc_code;					// Exception code of the last exception response (01, 02, 03 ...)
 extern volatile uint8_t gb_parity_sel;					// Var used for frame not received correctly
 extern volatile uint8_t gb_baud_rate_sel;
 extern volatile uint32_t gb_baud_value;					// Var used to fill value as per ETS configuration and write to uart peripheral in main file

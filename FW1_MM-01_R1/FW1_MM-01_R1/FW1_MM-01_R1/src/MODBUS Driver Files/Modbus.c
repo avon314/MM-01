@@ -41,6 +41,9 @@
 #define DEBUG_TEST      1
 
 volatile uint8_t gb_correct_frame_rcvd = 0;          //Var used for correct response of the frame used in application for further processing
+volatile uint8_t gb_mb_exc_frame_rcvd = 0;           //Set when a valid exception response is received, processed in application
+volatile uint8_t gb_mb_exc_slave = 0;                //Slave address of the last exception response
+volatile uint8_t gb_mb_exc_code = 0;                 //Exception code of the last exception response
 volatile uint8_t gb_baud_rate_sel = 4;
 
 volatile uint32_t gb_baud_value = 0;					//Var used to fill value as per ETS configuration and write to uart peripheral in main file
@@ -662,48 +665,38 @@ int frame_rcvd(void)
         {
             /* if CRC is correct then check function code and if function code is of error
                 then take appropriate action */
-            if ((gb_rcv_str[0] & (1 << 7)))
+            /* Exception response : [SA][FC | 0x80][EC][CRC_L][CRC_H]. Bit 7 is in the function code byte, not the slave address. */
+            if ((gb_rcv_str[1] & (1 << 7)))
             {
                 #if DEBUG_UART || 1
             	Print_Message("\n\rError Function code");
                 #endif
 
-                /* Depending upon which type of error ,return can be done here */
                 gb_byte_count = 0;                                                          			//Var cleared used to count received byte for crc calculation
-                /*** Error is occurred and so retrial is not to be performed again ,Need to check*/
-//                gb_response_time = 0;                                                       			//clear timer value loaded
-//                gb_send_frame = 0;                                                          			//clear flag to send frame
-//                gb_retry_count = 0;                                                         			//Clear retry count as if EOF is received retry count is reseted to 0
-                if (gb_rcv_str[1] == 0x01)
+                /* Slave has answered, so no retrial for this request. */
+                gb_response_time = 0;                                                       			//clear timer value loaded
+                gb_send_frame = 0;                                                          			//clear flag to send frame
+                gb_retry_count = 0;                                                         			//Clear retry count as response is received
+
+                /* Hand over slave address and exception code to application (ME frame). */
+                gb_mb_exc_slave = gb_rcv_str[0];
+                gb_mb_exc_code = gb_rcv_str[2];
+                gb_mb_exc_frame_rcvd = 1;
+
+                /* Slave is alive even though it reported an exception. */
+                if ((gb_rcv_str[0] > 0) && (gb_rcv_str[0] <= TOTAL_SLAVES)
+                && (active_slaves[gb_rcv_str[0] - 1] == 0) && (gb_start_sending_dpt == 1))
                 {
-                    /***Function not supported ****/
-                    gb_rcvd_flag = 0;                                                                   //clear receive flag
-                    gb_flag_inter_char_error = 0;                                                        //clear flag set in 1.
-                    return -1;
+                    active_slaves[gb_rcv_str[0] - 1] = 1;
+                    gb_send_cs_to_server = 1;
                 }
-                else if (gb_rcv_str[1] == 0x02)
-                {
-                    /**** Starting address not OK and starting address + quantity of outputs not OK ****/
-                    gb_rcvd_flag = 0;                                                                   //clear receive flag
-                    gb_flag_inter_char_error = 0;                                                        //clear flag set in 1.
-                    return -2;
-                }
-                else if (gb_rcv_str[1] == 0x03)
-                {
-                    /***Quantity of output is not in limit****/
-                    gb_rcvd_flag = 0;                                                                   //clear receive flag
-                    gb_flag_inter_char_error = 0;
-                    return -3;
-                }
-                else if (gb_rcv_str[1] == 0x04)
-                {
-                    /*** Read Discrete output not OK ***/
-                    gb_rcvd_flag = 0;                                                                   //clear receive flag
-                    gb_flag_inter_char_error = 0;
-                    return -4;
-                }
+
+                gb_rcvd_flag = 0;                                                                   //clear receive flag
+                gb_flag_inter_char_error = 0;                                                        //clear flag set in 1.5char
+                frame_error_f = 0;
+                return -((int)gb_mb_exc_code);
             }
-            else if ((gb_rcv_str[0] & (1 << 7)) == 0)
+            else if ((gb_rcv_str[1] & (1 << 7)) == 0)
             {
                 #if DEBUG_UART
             	Print_Message("\n\rCorrect response received:\n");

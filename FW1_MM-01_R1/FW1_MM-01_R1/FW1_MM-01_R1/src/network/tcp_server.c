@@ -723,6 +723,7 @@ void Send_Data_Client_To_Server(void *pvParameters)
 							netbuf_first(inbuf);
 							do
 							{
+								wdt_restart(WDT);	// Restart the watch dog timer. Otherwise controller will restart.
 								netbuf_data(inbuf, (void**)&data, &len);
 								
 								#if 0

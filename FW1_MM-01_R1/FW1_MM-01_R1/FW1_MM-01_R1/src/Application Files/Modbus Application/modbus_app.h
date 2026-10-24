@@ -31,9 +31,19 @@
 #define DEBUG_MODBUS_STORAGE    (0)                                         // Debug flag for Modbus storage operations
 #define DEBUG_MD_SERVER         (0)                                         // Debug flag for Modbus server communication
 #define DEBUG_WR_DATA           (0)                                         // Debug flag for Modbus write operations
+#define DEBUG_MB_EXC            (0)                                         // Debug flag for Modbus exception (ME) reporting
 
 extern uint8_t active_slaves[TOTAL_SLAVES];                                 // Array to track active/responding slaves (1=active, 0=inactive)
 extern U8 gb_send_cs_to_server;                                             // Flag to send connection status to server
+extern U8 gb_mb_exc_status[TOTAL_SLAVES];                                   // Exception code per slave reported to server in "ME" (0 = no error)
+extern U8 gb_mb_exc_clr[TOTAL_SLAVES];                                      // 1 = exception cleared, reported as [SA,0] until server ack
+#define ME_CHECK_DISABLED       (0)                                         // Power on / slave scan, exceptions not checked
+#define ME_CHECK_ARMED          (1)                                         // CS frame acknowledged, start with next DPT cycle
+#define ME_CHECK_ACTIVE         (2)                                         // Exceptions checked and reported on COV
+extern volatile U8 gb_me_check_state;                                       // ME checking state (ME_CHECK_xxx)
+extern U8 gb_send_me_to_server;                                           // Flag to send Modbus exception status (ME) to server on COV
+extern U8 gb_me_change_cnt;                                                 // Incremented on every change of gb_mb_exc_status
+extern U8 gb_me_sent_cnt;                                                   // gb_me_change_cnt value carried in the last frame sent to server
 extern U8 gb_mb_write_processing_f;                                         // Flag indicating Modbus write operation in progress
 extern U8 gb_write_to_req_f;                                                // Flag indicating write request pending
 
@@ -94,4 +104,6 @@ void Update_Last_Sent_Bytes_MD(void);
 void Write_to_Register_Functionality(U8 dpt_num,U8 *data_buf);
 void Get_Modbus_Data(uint8_t *dst, uint8_t *src, uint8_t order);
 void Store_DPT_Into_Memory(uint8_t store_type, uint8_t *dpt_value);
+void Record_Modbus_Exception(U8 slave_addr, U8 exc_code);
+void Evaluate_Modbus_Exception_COV(void);
 #endif /* MODBUS_APP_H_ */
