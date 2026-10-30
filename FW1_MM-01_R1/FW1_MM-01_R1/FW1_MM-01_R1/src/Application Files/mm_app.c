@@ -1003,5 +1003,6 @@ void Read_Memory_For_PowerON_State(void)
 	Read_MS_Data_From_EEPROM();				//read modbus setting data at power on
 	Get_Last_Dt_Tm_From_Flash();            //read last store date and time
 	Read_IS_Boundary_Flag();                //read input log boundary flag value
+	Read_Modbus_Write_Status_From_EEP();    //read Modbus write exception status ("ME")
 	Read_MD_Boundary_Flag();                //read modbus log bundary flag value
 }

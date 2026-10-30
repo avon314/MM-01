@@ -51,7 +51,8 @@ volatile MB_OP_STATE modbus_op_state = MB_OP_NONE;
 
 U8 gb_mb_exc_status[TOTAL_SLAVES] = {0};                                    // Exception code per slave reported to server ("ME"), 0 = no error
 static U8 gb_mb_exc_cycle[TOTAL_SLAVES] = {0};                              // Exception codes collected during the current DPT poll cycle
-U8 gb_mb_exc_clr[TOTAL_SLAVES] = {0};                                      // 1 = exception cleared, report [SA,0] until server ack
+U8 gb_mb_wr_exc_status[TOTAL_SLAVES] = {0};                                // Write exception code per slave reported in "ME" (0 = last write OK)
+U8 gb_mb_exc_clr[TOTAL_SLAVES] = {0};                                      // 1 = read/write exception cleared, report [SA,RE,WE] until server ack
 U8 gb_send_me_to_server = 0;                                                // Flag to send "ME" to server, cleared on server ack
 volatile U8 gb_me_check_state = ME_CHECK_DISABLED;                         // ME checking state, enabled after CS frame is acknowledged
 U8 gb_me_change_cnt = 0;                                                    // Incremented on every change of gb_mb_exc_status
@@ -448,6 +449,7 @@ void Modbus_Functionality_Task(void *pvParameters)
 					}
 					break;
 					case MB_OP_WRITE:                                       // Response for write operation
+					Record_Modbus_Write_Status(gb_rcv_str[0], 0);           // Write accepted, clear write error in "ME"
 					// WRITE ACK received — DO NOT parse as DPT
 					mb_poll_dpt = 1;                                        // Resume polling after write
 					gb_mb_write_processing_f = 0;                           // Clear write processing flag
@@ -466,7 +468,8 @@ void Modbus_Functionality_Task(void *pvParameters)
 					case MB_OP_DPT_READ:                                    // Exception for data packet read
 					Record_Modbus_Exception(gb_mb_exc_slave, gb_mb_exc_code); // Collect for "ME" frame, do not store as DPT value
 					break;
-					case MB_OP_WRITE:                                       // Exception for write request, not reported in "ME"
+					case MB_OP_WRITE:                                       // Exception for write request
+					Record_Modbus_Write_Status(gb_mb_exc_slave, gb_mb_exc_code); // Report write error in "ME" immediately
 					mb_poll_dpt = 1;                                        // Resume polling after write
 					gb_mb_write_processing_f = 0;                           // Clear write processing flag
 					modbus_op_state = MB_OP_DPT_READ;                       // Return to DPT reading mode
@@ -1357,7 +1360,8 @@ void Record_Modbus_Exception(U8 slave_addr, U8 exc_code)
  * Description	 : Called after every complete DPT poll cycle. Compares the
  *                 exceptions collected in this cycle with the last reported
  *                 status and requests an "ME" frame only on change of value.
- *                 Slave whose exception is cleared is reported as [SA,0]
+ *                 Slave whose read exception is cleared is reported with
+ *                 read error 0 ([SA,0,WE])
  *                 until the server acknowledges it.
  *
  * Notes	     : After power on, checking starts with the first complete cycle
@@ -1386,13 +1390,9 @@ void Evaluate_Modbus_Exception_COV(void)
 		taskENTER_CRITICAL();                                               // Frame is built from TCP task
 		for (U8 idx = 0; idx < TOTAL_SLAVES; idx++)
 		{
-			if (gb_mb_exc_cycle[idx] != 0)                                  // Slave in exception, reported with its code
+			if ((gb_mb_exc_cycle[idx] == 0) && (gb_mb_exc_status[idx] != 0)) // Read exception cleared
 			{
-				gb_mb_exc_clr[idx] = 0;
-			}
-			else if (gb_mb_exc_status[idx] != 0)                             // Exception cleared
-			{
-				gb_mb_exc_clr[idx] = 1;                                     // Report as [SA,0]
+				gb_mb_exc_clr[idx] = 1;                                     // Report read error 0 until server ack
 			}
 			else
 			{
@@ -1414,4 +1414,171 @@ void Evaluate_Modbus_Exception_COV(void)
 	}
 
 	memset(gb_mb_exc_cycle, 0, TOTAL_SLAVES);                               // Start collecting for next cycle
+}
+
+
+
+/*****************************************************************************
+ * Function name : Record_Modbus_Write_Status.
+ * Returns		 : void.
+ * Arguments     : U8 --> slave address, U8 --> exception code (0 = write OK).
+ * Created by	 :
+ * Date created	 : 30/10/2026.
+ *
+ * Description	 : Updates write exception status of a slave and requests an
+ *                 "ME" frame immediately on change of value. Write error is
+ *                 cleared (reported as 0) when a later write to the same slave
+ *                 is accepted.
+ *
+ * Notes	     : Write without response (retries failed) does not change status.
+ *                 Status is stored in EEPROM and restored at power on.
+ * Global Variables Affected : gb_mb_wr_exc_status, gb_mb_exc_clr,
+ *                             gb_send_me_to_server, gb_me_change_cnt
+ *****************************************************************************/
+void Record_Modbus_Write_Status(U8 slave_addr, U8 exc_code)
+{
+	if (gb_me_check_state == ME_CHECK_DISABLED)                             // Not yet enabled after power on (CS frame not sent)
+	{
+		return;
+	}
+
+	if ((slave_addr == 0) || (slave_addr > TOTAL_SLAVES))                   // Validate slave address range
+	{
+		return;
+	}
+
+	if (gb_mb_wr_exc_status[slave_addr - 1] == exc_code)                    // No change of value
+	{
+		return;
+	}
+
+	#if (DEBUG_ALL || DEBUG_MB_EXC)
+	Print_Message("\nModbus write status, Slave : ");
+	Print_Number(slave_addr);
+	Print_Message(" Code : ");
+	Print_Number(exc_code);
+	#endif
+
+	taskENTER_CRITICAL();                                                   // Frame is built from TCP task
+	if (exc_code == 0)
+	{
+		gb_mb_exc_clr[slave_addr - 1] = 1;                                  // Write error cleared, report 0 until server ack
+	}
+	else
+	{
+		__NOP();
+	}
+	gb_mb_wr_exc_status[slave_addr - 1] = exc_code;                         // Update reported write status
+	gb_me_change_cnt++;                                                     // Mark new status to be acknowledged
+	gb_send_me_to_server = FLAG_SET;                                        // Send "ME" in next frame
+	taskEXIT_CRITICAL();
+	
+	Write_Modbus_Write_Status_To_EEP();                                     // Retain over power cycle (written only on change)
+}
+
+
+
+/*****************************************************************************
+ * Function name : Write_Modbus_Write_Status_To_EEP.
+ * Returns		 : void.
+ * Arguments     : nothing.
+ * Created by	 :
+ * Date created	 : 30/10/2026.
+ *
+ * Description	 : Stores write exception codes of all slaves with CRC, so that
+ *                 write errors are retained over power cycle.
+ *
+ * Notes	     : Called only on change of write status.
+ * Global Variables Affected : NA.
+ *****************************************************************************/
+void Write_Modbus_Write_Status_To_EEP(void)
+{
+	U8 lcl_buf[MB_WR_EXC_DATA_SIZE] = {0};
+
+	memcpy(lcl_buf, gb_mb_wr_exc_status, TOTAL_SLAVES);                     // Write code of slave 1 to 16
+	CRC_Calculate_Check(lcl_buf, TOTAL_SLAVES, CRC_CALC);                   // Calculate CRC
+	lcl_buf[TOTAL_SLAVES]     = gb_Temp_CRC[0];
+	lcl_buf[TOTAL_SLAVES + 1] = gb_Temp_CRC[1];
+	EEPROM_Byte_Write(MB_WR_EXC_EEP_START_LOC, lcl_buf, MB_WR_EXC_DATA_SIZE);
+}
+
+
+
+/*****************************************************************************
+ * Function name : Read_Modbus_Write_Status_From_EEP.
+ * Returns		 : void.
+ * Arguments     : nothing.
+ * Created by	 :
+ * Date created	 : 30/10/2026.
+ *
+ * Description	 : Restores write exception codes at power on. If memory is
+ *                 erased (0xFF) or CRC fails, all codes are cleared and the
+ *                 block is written back with a valid CRC.
+ *
+ * Notes	     : Called from Read_Memory_For_PowerON_State().
+ * Global Variables Affected : gb_mb_wr_exc_status
+ *****************************************************************************/
+void Read_Modbus_Write_Status_From_EEP(void)
+{
+	U8 lcl_buf[MB_WR_EXC_DATA_SIZE] = {0};
+
+	if (EEPROM_Byte_Read(MB_WR_EXC_EEP_START_LOC, lcl_buf, MB_WR_EXC_DATA_SIZE) == 0)
+	{
+		if (CRC_Calculate_Check(lcl_buf, TOTAL_SLAVES, CRC_CHECK) == 1)     // Valid data
+		{
+			memcpy(gb_mb_wr_exc_status, lcl_buf, TOTAL_SLAVES);
+		}
+		else                                                                // Erased (0xFF) or bad CRC
+		{
+			memset(gb_mb_wr_exc_status, 0, TOTAL_SLAVES);
+			Write_Modbus_Write_Status_To_EEP();                             // Initialise block with valid CRC
+		}
+
+		#if (DEBUG_ALL || DEBUG_MB_EXC)
+		Print_Message("\nStored Modbus write status : ");
+		for (U8 idx = 0; idx < TOTAL_SLAVES; idx++)
+		{
+			Print_Number(gb_mb_wr_exc_status[idx]);
+			Print_Message(",");
+		}
+		#endif
+	}
+	else
+	{
+		__NOP();
+	}
+}
+
+
+
+/*****************************************************************************
+ * Function name : Resend_Stored_Write_Errors.
+ * Returns		 : void.
+ * Arguments     : nothing.
+ * Created by	 :
+ * Date created	 : 30/10/2026.
+ *
+ * Description	 : After power on, requests "ME" once if any write error was
+ *                 restored from EEPROM, so the server stays in sync.
+ *
+ * Notes	     : Called when the CS frame is acknowledged by the server.
+ * Global Variables Affected : gb_send_me_to_server, gb_me_change_cnt
+ *****************************************************************************/
+void Resend_Stored_Write_Errors(void)
+{
+	for (U8 idx = 0; idx < TOTAL_SLAVES; idx++)
+	{
+		if (gb_mb_wr_exc_status[idx] != 0)                                  // At least one stored write error
+		{
+			taskENTER_CRITICAL();
+			gb_me_change_cnt++;                                             // Mark status to be acknowledged
+			gb_send_me_to_server = FLAG_SET;                                // Send "ME" in next frame
+			taskEXIT_CRITICAL();
+			break;
+		}
+		else
+		{
+			__NOP();
+		}
+	}
 }

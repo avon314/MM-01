@@ -234,9 +234,18 @@
 #define ALRM_EEP_END_LOC		(2107421)  // Byte Address.
 /***** End of Macros for ALARM VALUE *****/
 
+/***** Macros for Modbus write exception status ("ME") *****/
+// 16 slaves x 1 byte write exception code + 2 bytes of CRC = 18 bytes.
+#define MB_WR_EXC_DATA_SIZE		(18)
+// ---------------------------- ***** -------------------------------- //
+#define MB_WR_EXC_EEP_PAGE		(4117)
+#define MB_WR_EXC_EEP_START_LOC	(2107904)	// Byte Address (page 4117 offset 0).
+#define MB_WR_EXC_EEP_END_LOC	(2107921)	// Byte Address.
+/***** End of Macros for Modbus write exception status *****/
+
 /*****************************************************
-		EMPTY SPACE (Reserved for future use.) 
-		page 4117 to page 8191 (4075 pages unused)
+		EMPTY SPACE (Reserved for future use.)
+		page 4118 to page 8191 (4074 pages unused)
 		8191 is the last page for eeprom
 *****************************************************/
 

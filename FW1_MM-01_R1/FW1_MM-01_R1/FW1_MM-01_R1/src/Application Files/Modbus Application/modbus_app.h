@@ -36,7 +36,8 @@
 extern uint8_t active_slaves[TOTAL_SLAVES];                                 // Array to track active/responding slaves (1=active, 0=inactive)
 extern U8 gb_send_cs_to_server;                                             // Flag to send connection status to server
 extern U8 gb_mb_exc_status[TOTAL_SLAVES];                                   // Exception code per slave reported to server in "ME" (0 = no error)
-extern U8 gb_mb_exc_clr[TOTAL_SLAVES];                                      // 1 = exception cleared, reported as [SA,0] until server ack
+extern U8 gb_mb_wr_exc_status[TOTAL_SLAVES];                                // Write exception code per slave reported in "ME" (0 = last write OK)
+extern U8 gb_mb_exc_clr[TOTAL_SLAVES];                                      // 1 = read/write exception cleared, reported until server ack
 #define ME_CHECK_DISABLED       (0)                                         // Power on / slave scan, exceptions not checked
 #define ME_CHECK_ARMED          (1)                                         // CS frame acknowledged, start with next DPT cycle
 #define ME_CHECK_ACTIVE         (2)                                         // Exceptions checked and reported on COV
@@ -105,5 +106,9 @@ void Write_to_Register_Functionality(U8 dpt_num,U8 *data_buf);
 void Get_Modbus_Data(uint8_t *dst, uint8_t *src, uint8_t order);
 void Store_DPT_Into_Memory(uint8_t store_type, uint8_t *dpt_value);
 void Record_Modbus_Exception(U8 slave_addr, U8 exc_code);
+void Record_Modbus_Write_Status(U8 slave_addr, U8 exc_code);
+void Write_Modbus_Write_Status_To_EEP(void);
+void Read_Modbus_Write_Status_From_EEP(void);
+void Resend_Stored_Write_Errors(void);
 void Evaluate_Modbus_Exception_COV(void);
 #endif /* MODBUS_APP_H_ */
