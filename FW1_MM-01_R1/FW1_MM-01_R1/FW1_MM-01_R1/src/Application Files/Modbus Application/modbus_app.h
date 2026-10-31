@@ -85,7 +85,8 @@ typedef enum
 	MB_OP_NONE = 0,                                                         // No operation
 	MB_OP_SCAN,                                                             // Scanning for active slaves
 	MB_OP_DPT_READ,                                                         // Reading data packets from slaves
-	MB_OP_WRITE                                                             // Writing data to slave registers
+	MB_OP_WRITE,                                                            // Writing data to slave registers
+	MB_OP_WRITE_READ                                                        // Reading present value before write (FC05 / FC06)
 } MB_OP_STATE;
 
 extern volatile MB_OP_STATE modbus_op_state;                               // Current Modbus operation state
@@ -103,6 +104,8 @@ void Write_Last_Stored_Data_Packet_Location(int rcv_last_store_loc);
 void Store_Modbus_Data_Packets( U8 *day_date, U8 *time_arr, U8 dp_number, U8 *dp_value);
 void Update_Last_Sent_Bytes_MD(void);
 void Write_to_Register_Functionality(U8 dpt_num,U8 *data_buf);
+void Process_Write_Read_Response(void);
+void Resume_DPT_Polling(void);
 void Get_Modbus_Data(uint8_t *dst, uint8_t *src, uint8_t order);
 void Store_DPT_Into_Memory(uint8_t store_type, uint8_t *dpt_value);
 void Record_Modbus_Exception(U8 slave_addr, U8 exc_code);

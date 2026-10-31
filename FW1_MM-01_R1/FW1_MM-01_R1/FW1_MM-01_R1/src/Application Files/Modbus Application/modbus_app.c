@@ -58,6 +58,17 @@ volatile U8 gb_me_check_state = ME_CHECK_DISABLED;                         // ME
 U8 gb_me_change_cnt = 0;                                                    // Incremented on every change of gb_mb_exc_status
 U8 gb_me_sent_cnt = 0;                                                      // gb_me_change_cnt value carried in the last frame sent
 
+typedef struct
+{
+	U8  slave_addr;                                                         // Slave address of write data point
+	U16 reg_addr;                                                           // Coil / register address of write data point
+	U8  fun_code;                                                           // Configured write function code (5, 6)
+	U8  data_len;                                                           // Configured data length (0/1 = 1 byte, 2/3 = 2 bytes written)
+	U8  value[2];                                                           // 2 bytes received from server (MSB, LSB)
+} mb_write_ctx_t;
+
+static mb_write_ctx_t gb_wr_ctx;                                            // Write operation in progress
+
 /**** End for Declaration for global variables ****/
 
 /*****************************************************************************
@@ -451,9 +462,10 @@ void Modbus_Functionality_Task(void *pvParameters)
 					case MB_OP_WRITE:                                       // Response for write operation
 					Record_Modbus_Write_Status(gb_rcv_str[0], 0);           // Write accepted, clear write error in "ME"
 					// WRITE ACK received — DO NOT parse as DPT
-					mb_poll_dpt = 1;                                        // Resume polling after write
-					gb_mb_write_processing_f = 0;                           // Clear write processing flag
-					modbus_op_state = MB_OP_DPT_READ;                       // Return to DPT reading mode
+					Resume_DPT_Polling();                                   // Resume polling after write
+					break;
+					case MB_OP_WRITE_READ:                                  // Present value read before write
+					Process_Write_Read_Response();                          // Invert (FC05) / merge (FC06) and write
 					break;
 					default:
 					break;
@@ -469,10 +481,9 @@ void Modbus_Functionality_Task(void *pvParameters)
 					Record_Modbus_Exception(gb_mb_exc_slave, gb_mb_exc_code); // Collect for "ME" frame, do not store as DPT value
 					break;
 					case MB_OP_WRITE:                                       // Exception for write request
+					case MB_OP_WRITE_READ:                                  // Exception for read before write
 					Record_Modbus_Write_Status(gb_mb_exc_slave, gb_mb_exc_code); // Report write error in "ME" immediately
-					mb_poll_dpt = 1;                                        // Resume polling after write
-					gb_mb_write_processing_f = 0;                           // Clear write processing flag
-					modbus_op_state = MB_OP_DPT_READ;                       // Return to DPT reading mode
+					Resume_DPT_Polling();                                   // Resume polling after write
 					break;
 					default:
 					break;
@@ -979,7 +990,25 @@ void Write_to_Register_Functionality(U8 dpt_num,U8 *data_buf)
 	Print_Message("\nSlave is Active");
 	#endif
 	
-	if((mp_config.dp_mb_fun == 5) || (mp_config.dp_mb_fun == 6) || (mp_config.dp_mb_fun == 15)) // Validate function code is for write operations
+	if((mp_config.dp_mb_fun == 5) || (mp_config.dp_mb_fun == 6))           // FC05 / FC06 : read present value first, then write
+	{
+		U8 dummy_buf[2] = {0};
+
+		gb_wr_ctx.slave_addr = mp_config.dp_slave_addr;
+		gb_wr_ctx.reg_addr   = (U16)mp_config.dp_reg_addr;
+		gb_wr_ctx.fun_code   = mp_config.dp_mb_fun;
+		gb_wr_ctx.data_len   = mp_config.dp_data_len;
+		gb_wr_ctx.value[0]   = data_buf[0];
+		gb_wr_ctx.value[1]   = data_buf[1];
+
+		gb_mb_write_processing_f = 1;                                       // Set flag to indicate write in progress
+		mb_poll_dpt = 0;                                                    // Pause DPT polling during write operation
+		modbus_op_state = MB_OP_WRITE_READ;                                 // Wait for present value
+		modbus_frame(gb_wr_ctx.slave_addr, ((gb_wr_ctx.fun_code == 5) ? 0x01 : 0x03), // FC01 coil / FC03 register
+		             gb_wr_ctx.reg_addr, 1, 0, dummy_buf);
+		send_frame();                                                       // Transmit read request to slave
+	}
+	else if(mp_config.dp_mb_fun == 15)                                      // FC15 : overwrite (unchanged)
 	{
 		gb_mb_write_processing_f = 1;                                       // Set flag to indicate write in progress
 		mb_poll_dpt = 0;                                                    // Pause DPT polling during write operation
@@ -1581,4 +1610,89 @@ void Resend_Stored_Write_Errors(void)
 			__NOP();
 		}
 	}
+}
+
+
+
+/*****************************************************************************
+ * Function name : Resume_DPT_Polling.
+ * Returns		 : void.
+ * Arguments     : nothing.
+ * Created by	 :
+ * Date created	 : 31/10/2026.
+ *
+ * Description	 : Ends a write operation and resumes DPT polling.
+ *
+ * Notes	     : Used after write ack, write / read exception, no response
+ *                 and CRC error.
+ * Global Variables Affected : mb_poll_dpt, gb_mb_write_processing_f,
+ *                             modbus_op_state
+ *****************************************************************************/
+void Resume_DPT_Polling(void)
+{
+	mb_poll_dpt = 1;                                                        // Resume polling
+	gb_mb_write_processing_f = 0;                                           // Clear write processing flag
+	modbus_op_state = MB_OP_DPT_READ;                                       // Return to DPT reading mode
+}
+
+
+
+/*****************************************************************************
+ * Function name : Process_Write_Read_Response.
+ * Returns		 : void.
+ * Arguments     : nothing.
+ * Created by	 :
+ * Date created	 : 31/10/2026.
+ *
+ * Description	 : Handles the present value read before a write:
+ *                 FC05 : coil read with FC01 is inverted and written.
+ *                 FC06 : register read with FC03; data length 0/1 keeps the
+ *                        high byte and writes the received low byte, data
+ *                        length 2/3 writes the 2 received bytes.
+ *
+ * Notes	     : Response from another slave / function or with short data
+ *                 ends the write and resumes polling.
+ * Global Variables Affected : modbus_op_state
+ *****************************************************************************/
+void Process_Write_Read_Response(void)
+{
+	U8 lcl_wr_buf[2] = {0};
+	U8 lcl_rd_fun = (gb_wr_ctx.fun_code == 5) ? 0x01 : 0x03;                // Read function used before write
+	U8 lcl_rd_cnt = (gb_wr_ctx.fun_code == 5) ? 1 : 2;                      // Expected byte count
+
+	/* Response must be from the same slave, for the read function, with full data */
+	if ((gb_rcv_str[0] != gb_wr_ctx.slave_addr) || (gb_rcv_str[1] != lcl_rd_fun) || (gb_rcv_str[2] < lcl_rd_cnt))
+	{
+		#if (DEBUG_ALL || DEBUG_MODBUS_DATA || DEBUG_WR_DATA)
+		Print_Message("\nInvalid response for read before write");
+		#endif
+		Resume_DPT_Polling();
+		return;
+	}
+
+	if (gb_wr_ctx.fun_code == 5)                                            // FC05 : invert present coil state
+	{
+		lcl_wr_buf[0] = (gb_rcv_str[3] & 0x01) ? 0x00 : 0xFF;               // ON -> 00 00, OFF -> FF 00
+		lcl_wr_buf[1] = 0x00;
+	}
+	else if ((gb_wr_ctx.data_len == 0) || (gb_wr_ctx.data_len == 1))        // FC06, 1 byte : keep high byte, change low byte
+	{
+		lcl_wr_buf[0] = gb_rcv_str[3];
+		lcl_wr_buf[1] = gb_wr_ctx.value[1];
+	}
+	else                                                                    // FC06, 2 / 4 byte : received 2 bytes to configured register
+	{
+		lcl_wr_buf[0] = gb_wr_ctx.value[0];
+		lcl_wr_buf[1] = gb_wr_ctx.value[1];
+	}
+
+	#if (DEBUG_ALL || DEBUG_MODBUS_DATA || DEBUG_WR_DATA)
+	Print_Message("\nWrite value : ");
+	Print_ASCII_HEX(lcl_wr_buf[0]);
+	Print_ASCII_HEX(lcl_wr_buf[1]);
+	#endif
+
+	modbus_op_state = MB_OP_WRITE;                                          // Wait for write ack
+	modbus_frame(gb_wr_ctx.slave_addr, gb_wr_ctx.fun_code, gb_wr_ctx.reg_addr, 1, 2, lcl_wr_buf);
+	send_frame();                                                           // Transmit write request to slave
 }

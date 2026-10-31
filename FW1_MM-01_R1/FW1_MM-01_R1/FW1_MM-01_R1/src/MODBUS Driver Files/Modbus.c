@@ -568,14 +568,12 @@ void send_frame(void)
 	   	gb_response_time = 0;
 	   	gb_send_frame = 0;
 	   	// *** RESUME POLLING ***	
-		if (modbus_op_state == MB_OP_WRITE)
+		if ((modbus_op_state == MB_OP_WRITE) || (modbus_op_state == MB_OP_WRITE_READ))
 		{
-			// WRITE failed ? resume polling safely
+			// WRITE (or read before write) failed ? resume polling safely
 			Print_Message("\nWrite failed, resuming DPT poll");
 
-			mb_poll_dpt = 1;
-			gb_mb_write_processing_f = 0;            
-			modbus_op_state = MB_OP_DPT_READ; 
+			Resume_DPT_Polling();
 			gb_send_mb_data = 1;
 			return;
 		}
@@ -747,9 +745,7 @@ int frame_rcvd(void)
 			Print_Message("\n\rCorrect response not received");                  //In this case no need to set flag for transmitting frame as send frame flag is not cleared
 			#endif
 			
-			mb_poll_dpt = 1;            //  resume polling if correct response is not received
-			gb_mb_write_processing_f = 0;
-			modbus_op_state = MB_OP_DPT_READ;
+			Resume_DPT_Polling();       //  resume polling if correct response is not received
 
             /* clear all array index where data is fill into array */
             for (int count1 =0; count1 < gb_byte_count; count1++)
