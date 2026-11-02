@@ -239,19 +239,21 @@ void Process_All_DPT_Packets(void)
 	U8 num_of_reg = 0;                                                      // Number of Modbus registers to read
 	U8 byte_len = 0;                                                        // Total byte length to read
 		
-	if((mp_config.dp_data_len == 0) || 	(mp_config.dp_data_len == 1) || (mp_config.dp_data_len == 2)) // 1 or 2 byte data
-	{
-		num_of_reg = 1;                                                     // Read 1 register (2 bytes)
-	}
-	else if(mp_config.dp_data_len == 3)                                     // 4 byte data
-	{
-		num_of_reg = 2;                                                     // Read 2 registers (4 bytes)
-	}
-	else
-	{
-		__NOP();
-	}
-	byte_len = num_of_reg * 2;                                              // Calculate byte length (each register is 2 bytes)
+	//if((mp_config.dp_data_len == 0) || 	(mp_config.dp_data_len == 1) || (mp_config.dp_data_len == 2)) // 1 or 2 byte data
+	//{
+	//	num_of_reg = 1;                                                     // Read 1 register (2 bytes)
+	//}
+	//else if(mp_config.dp_data_len == 3)                                     // 4 byte data
+	//{
+	//	num_of_reg = 2;                                                     // Read 2 registers (4 bytes)
+	//}
+	//else
+	//{
+	//	__NOP();
+	//}
+	num_of_reg = mp_config.dp_data_len;
+
+	//byte_len = num_of_reg * 2;                                        // Calculate byte length (each register is 2 bytes)
 		
 	uint8_t dummyBuf[2] = {0};                                              // Placeholder buffer for write operations (if needed)
 	// Check if slave is active

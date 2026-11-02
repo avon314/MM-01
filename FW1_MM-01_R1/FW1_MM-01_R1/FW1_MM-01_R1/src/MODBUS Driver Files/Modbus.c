@@ -376,141 +376,155 @@ uint8_t Get_Baud_Index(uint32_t baud)
 /* in case of multiple write register byte count should be in num of reg * 2 format */
 /* in case of write multiple coil byte count is calculated in form of number of coils to be write and number of coils/8 */
 void modbus_frame(uint8_t slave_address, uint8_t function_code, uint16_t starting_address,
-					uint16_t number_of_reg, uint8_t byte_count, uint8_t *data_buff)
+uint16_t num_of_reg, uint8_t byte_count, uint8_t *data_buff)
 {
-    switch (function_code)
+	uint16_t number_of_reg;
+	if((num_of_reg == 0) || (num_of_reg == 1) || (num_of_reg == 2)) // 1 or 2 byte data
 	{
-        case 0x01:
-                /* Read coil status */
-                count = 0;                                                          //clear count var used for index
-                gb_tx_frame[count++] = slave_address;                               //copy slave address
-                gb_tx_frame[count++] = function_code;                               //copy function code
-                reg_addr.register_addr = starting_address;
-                gb_tx_frame[count++] = reg_addr.Reg_Address[1];                     //copy starting address higher byte
-                gb_tx_frame[count++] = reg_addr.Reg_Address[0];                     //copy starting address lower byte
-                number_of_register.register_quantity = number_of_reg;
-                gb_tx_frame[count++] = number_of_register.quantity_register[1];     //copy quantity of register higher byte
-                gb_tx_frame[count++] = number_of_register.quantity_register[0];     //copy quantity of register lower byte
-                break;
-        case 0x02:
-                /* Read input status */
-                count = 0;                                                          //clear count var used for index
-                gb_tx_frame[count++] = slave_address;
-                gb_tx_frame[count++] = function_code;
-                reg_addr.register_addr = starting_address;
-                gb_tx_frame[count++] = reg_addr.Reg_Address[1];
-                gb_tx_frame[count++] = reg_addr.Reg_Address[0];
-                number_of_register.register_quantity = number_of_reg;
-                gb_tx_frame[count++] = number_of_register.quantity_register[1];
-                gb_tx_frame[count++] = number_of_register.quantity_register[0];
-                break;
-        case 0x03:
-                /* Read holding register */
-                count = 0;                                                          //clear count var used for index
-                gb_tx_frame[count++] = slave_address;
-                gb_tx_frame[count++] = function_code;
-                reg_addr.register_addr = starting_address;
-                gb_tx_frame[count++] = reg_addr.Reg_Address[1];
-                gb_tx_frame[count++] = reg_addr.Reg_Address[0];
-                number_of_register.register_quantity = number_of_reg;
-                gb_tx_frame[count++] = number_of_register.quantity_register[1];
-                gb_tx_frame[count++] = number_of_register.quantity_register[0];
-                break;
-        case 0x04:
-                /* Read input register */
-                count = 0;                                                          //clear count var used for index
-                gb_tx_frame[count++] = slave_address;
-                gb_tx_frame[count++] = function_code;
-                reg_addr.register_addr = starting_address;
-                gb_tx_frame[count++] = reg_addr.Reg_Address[1];
-                gb_tx_frame[count++] = reg_addr.Reg_Address[0];
-                number_of_register.register_quantity = number_of_reg;
-                gb_tx_frame[count++] = number_of_register.quantity_register[1];
-                gb_tx_frame[count++] = number_of_register.quantity_register[0];
-                break;
-        case 0x05:
-		        /*Print_Message("\nWrite single coils");*/
-                /* Write single coil */
-                count = 0;                                                          //clear count var used for index
-                gb_tx_frame[count++] = slave_address;
-                gb_tx_frame[count++] = function_code;
-                reg_addr.register_addr = starting_address;
-                gb_tx_frame[count++] = reg_addr.Reg_Address[1];
-                gb_tx_frame[count++] = reg_addr.Reg_Address[0];
-//                number_of_register.register_quantity = number_of_reg;
-//                gb_tx_frame[count++] = number_of_register.quantity_register[1];
-//                gb_tx_frame[count++] = number_of_register.quantity_register[0];
-                for(int i = 0; i < 2; i++){                                //According to byte count, data passed to buffer is copied to tx buffer and send on UART
-                    gb_tx_frame[count++] = data_buff[i];
-                }
-                break;
-        case 0x06:
-				/*Print_Message("\nWrite single register ");*/
-                /* Write single register  */
-                count = 0;                                                          //clear count var used for index
-                gb_tx_frame[count++] = slave_address;
-                gb_tx_frame[count++] = function_code;
-                reg_addr.register_addr = starting_address;
-                gb_tx_frame[count++] = reg_addr.Reg_Address[1];
-                gb_tx_frame[count++] = reg_addr.Reg_Address[0];
-//                number_of_register.register_quantity = number_of_reg;
-//                gb_tx_frame[count++] = number_of_register.quantity_register[1];
-//                gb_tx_frame[count++] = number_of_register.quantity_register[0];
-                for(int i = 0; i < 2; i++){                                //According to byte count, data passed to buffer is copied to tx buffer and send on UART
-                    gb_tx_frame[count++] = data_buff[i];
-                }
-                break;
-        case 0x10:
-                /* write multiple register */
-                count = 0;                                                          //clear count var used for index
-                gb_tx_frame[count++] = slave_address;
-                gb_tx_frame[count++] = function_code;
-                reg_addr.register_addr = starting_address;
-                gb_tx_frame[count++] = reg_addr.Reg_Address[1];
-                gb_tx_frame[count++] = reg_addr.Reg_Address[0];
-                number_of_register.register_quantity = number_of_reg;
-                gb_tx_frame[count++] = number_of_register.quantity_register[1];
-                gb_tx_frame[count++] = number_of_register.quantity_register[0];
-                gb_tx_frame[count++] = number_of_register.register_quantity * 2;
-                for(int i = 0; i < byte_count; i++){                                //According to byte count, data passed to buffer is copied to tx buffer and send on UART
-                    gb_tx_frame[count++] = data_buff[i];
-                }
-                break;
-        case 0x0F:
-	        	/*Print_Message("\nWrite multiple coils");*/
-                /* write multiple coils */
-                count = 0;                                                          //clear count var used for index
-                gb_tx_frame[count++] = slave_address;
-                gb_tx_frame[count++] = function_code;
-                reg_addr.register_addr = starting_address;
-                gb_tx_frame[count++] = reg_addr.Reg_Address[1];
-                gb_tx_frame[count++] = reg_addr.Reg_Address[0];
-                number_of_register.register_quantity = number_of_reg;
-                gb_tx_frame[count++] = number_of_register.quantity_register[1];
-                gb_tx_frame[count++] = number_of_register.quantity_register[0];
-                if(number_of_register.register_quantity % 8 != 0){
-                    gb_tx_frame[count++] = (number_of_register.register_quantity / 8 + 1);
-                    byte_count = (number_of_register.register_quantity / 8 + 1);                        //byte count var modified as for multiple coil depencing upon quantity of coils data should be filled
-                }else{
-                    gb_tx_frame[count++] = (number_of_register.register_quantity / 8);
-                    byte_count = (number_of_register.register_quantity / 8);     //byte count var modified as for multiple coil depencing upon quantity of coils data should be filled
-                }
+		number_of_reg = 1;                                                     // Read 1 register (2 bytes)
+	}
+	else if(num_of_reg == 3)                                     // 4 byte data
+	{
+		number_of_reg = 2;                                                     // Read 2 registers (4 bytes)
+	}
+	else
+	{
+		__NOP();
+	}
+	byte_count= number_of_reg*2;
+	switch (function_code)
+	{
+		case 0x01:
+		/* Read coil status */
+		count = 0;                                                          //clear count var used for index
+		gb_tx_frame[count++] = slave_address;                               //copy slave address
+		gb_tx_frame[count++] = function_code;                               //copy function code
+		reg_addr.register_addr = starting_address;
+		gb_tx_frame[count++] = reg_addr.Reg_Address[1];                     //copy starting address higher byte
+		gb_tx_frame[count++] = reg_addr.Reg_Address[0];                     //copy starting address lower byte
+		number_of_register.register_quantity = num_of_reg;
+		gb_tx_frame[count++] = number_of_register.quantity_register[1];     //copy quantity of register higher byte
+		gb_tx_frame[count++] = number_of_register.quantity_register[0];     //copy quantity of register lower byte
+		break;
+		case 0x02:
+		/* Read input status */
+		count = 0;                                                          //clear count var used for index
+		gb_tx_frame[count++] = slave_address;
+		gb_tx_frame[count++] = function_code;
+		reg_addr.register_addr = starting_address;
+		gb_tx_frame[count++] = reg_addr.Reg_Address[1];
+		gb_tx_frame[count++] = reg_addr.Reg_Address[0];
+		number_of_register.register_quantity = num_of_reg;
+		gb_tx_frame[count++] = number_of_register.quantity_register[1];
+		gb_tx_frame[count++] = number_of_register.quantity_register[0];
+		break;
+		case 0x03:
+		/* Read holding register */
+		count = 0;                                                          //clear count var used for index
+		gb_tx_frame[count++] = slave_address;
+		gb_tx_frame[count++] = function_code;
+		reg_addr.register_addr = starting_address;
+		gb_tx_frame[count++] = reg_addr.Reg_Address[1];
+		gb_tx_frame[count++] = reg_addr.Reg_Address[0];
+		number_of_register.register_quantity = number_of_reg;
+		gb_tx_frame[count++] = number_of_register.quantity_register[1];
+		gb_tx_frame[count++] = number_of_register.quantity_register[0];
+		break;
+		case 0x04:
+		/* Read input register */
+		count = 0;                                                          //clear count var used for index
+		gb_tx_frame[count++] = slave_address;
+		gb_tx_frame[count++] = function_code;
+		reg_addr.register_addr = starting_address;
+		gb_tx_frame[count++] = reg_addr.Reg_Address[1];
+		gb_tx_frame[count++] = reg_addr.Reg_Address[0];
+		number_of_register.register_quantity = number_of_reg;
+		gb_tx_frame[count++] = number_of_register.quantity_register[1];
+		gb_tx_frame[count++] = number_of_register.quantity_register[0];
+		break;
+		case 0x05:
+		/*Print_Message("\nWrite single coils");*/
+		/* Write single coil */
+		count = 0;                                                          //clear count var used for index
+		gb_tx_frame[count++] = slave_address;
+		gb_tx_frame[count++] = function_code;
+		reg_addr.register_addr = starting_address;
+		gb_tx_frame[count++] = reg_addr.Reg_Address[1];
+		gb_tx_frame[count++] = reg_addr.Reg_Address[0];
+		//                number_of_register.register_quantity = number_of_reg;
+		//                gb_tx_frame[count++] = number_of_register.quantity_register[1];
+		//                gb_tx_frame[count++] = number_of_register.quantity_register[0];
+		for(int i = 0; i < 2; i++){                                //According to byte count, data passed to buffer is copied to tx buffer and send on UART
+			gb_tx_frame[count++] = data_buff[i];
+		}
+		break;
+		case 0x06:
+		/*Print_Message("\nWrite single register ");*/
+		/* Write single register  */
+		count = 0;                                                          //clear count var used for index
+		gb_tx_frame[count++] = slave_address;
+		gb_tx_frame[count++] = function_code;
+		reg_addr.register_addr = starting_address;
+		gb_tx_frame[count++] = reg_addr.Reg_Address[1];
+		gb_tx_frame[count++] = reg_addr.Reg_Address[0];
+		//                number_of_register.register_quantity = number_of_reg;
+		//                gb_tx_frame[count++] = number_of_register.quantity_register[1];
+		//                gb_tx_frame[count++] = number_of_register.quantity_register[0];
+		for(int i = 0; i < 2; i++){                                //According to byte count, data passed to buffer is copied to tx buffer and send on UART
+			gb_tx_frame[count++] = data_buff[i];
+		}
+		break;
+		case 0x10:
+		/* write multiple register */
+		count = 0;                                                          //clear count var used for index
+		gb_tx_frame[count++] = slave_address;
+		gb_tx_frame[count++] = function_code;
+		reg_addr.register_addr = starting_address;
+		gb_tx_frame[count++] = reg_addr.Reg_Address[1];
+		gb_tx_frame[count++] = reg_addr.Reg_Address[0];
+		number_of_register.register_quantity = number_of_reg;
+		gb_tx_frame[count++] = number_of_register.quantity_register[1];
+		gb_tx_frame[count++] = number_of_register.quantity_register[0];
+		gb_tx_frame[count++] = number_of_register.register_quantity * 2;
+		for(int i = 0; i < byte_count; i++){                                //According to byte count, data passed to buffer is copied to tx buffer and send on UART
+			gb_tx_frame[count++] = data_buff[i];
+		}
+		break;
+		case 0x0F:
+		/*Print_Message("\nWrite multiple coils");*/
+		/* write multiple coils */
+		count = 0;                                                          //clear count var used for index
+		gb_tx_frame[count++] = slave_address;
+		gb_tx_frame[count++] = function_code;
+		reg_addr.register_addr = starting_address;
+		gb_tx_frame[count++] = reg_addr.Reg_Address[1];
+		gb_tx_frame[count++] = reg_addr.Reg_Address[0];
+		number_of_register.register_quantity = num_of_reg;
+		gb_tx_frame[count++] = number_of_register.quantity_register[1];
+		gb_tx_frame[count++] = number_of_register.quantity_register[0];
+		if(number_of_register.register_quantity % 8 != 0){
+			gb_tx_frame[count++] = (number_of_register.register_quantity / 8 + 1);
+			byte_count = (number_of_register.register_quantity / 8 + 1);                        //byte count var modified as for multiple coil depencing upon quantity of coils data should be filled
+			}else{
+			gb_tx_frame[count++] = (number_of_register.register_quantity / 8);
+			byte_count = (number_of_register.register_quantity / 8);     //byte count var modified as for multiple coil depencing upon quantity of coils data should be filled
+		}
 
-                for(int i = 0; i < byte_count; i++){                                //According to byte count, data passed to buffer is copied to tx buffer and send on UART
-                    gb_tx_frame[count++] = data_buff[i];
-                }
-                break;
+		for(int i = 0; i < byte_count; i++){                                //According to byte count, data passed to buffer is copied to tx buffer and send on UART
+			gb_tx_frame[count++] = data_buff[i];
+		}
+		break;
 
-    }
+	}
 
-    CRC_Calculate_Check(gb_tx_frame,count,CRC_CALC);                        //calculate CRC
+	CRC_Calculate_Check(gb_tx_frame,count,CRC_CALC);                        //calculate CRC
 
-    gb_tx_frame[count++] = gb_Temp_CRC[0];                                  //copy CRC lower byte
-    gb_tx_frame[count++] = gb_Temp_CRC[1];                                  //copy CRC higher byte
+	gb_tx_frame[count++] = gb_Temp_CRC[0];                                  //copy CRC lower byte
+	gb_tx_frame[count++] = gb_Temp_CRC[1];                                  //copy CRC higher byte
 	
 
-    gb_send_frame = 1;														/* set flag to send frame */
-    gb_retry_count = 0;	// count made 0 in this function as new frame is prepared only once after successful data reception or data to transmit is ready
+	gb_send_frame = 1;														/* set flag to send frame */
+	gb_retry_count = 0;	// count made 0 in this function as new frame is prepared only once after successful data reception or data to transmit is ready
 }
 
 

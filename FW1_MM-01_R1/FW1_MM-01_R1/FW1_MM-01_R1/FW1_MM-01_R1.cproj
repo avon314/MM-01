@@ -433,7 +433,7 @@
         <documentation help="https://asf.microchip.com/docs/3.52.0/thirdparty.lwip.netconn_http_stats_example.sam4e_ek/html/index.html" />
         <offline-documentation help="" />
         <dependencies>
-          <content-extension eid="atmel.asf" uuidref="Atmel.ASF" version="3.52.0" />
+          <content-extension eid="atmel.asf" uuidref="Atmel.ASF" version="3.42.0" />
         </dependencies>
         <project id="thirdparty.lwip.netconn_http_stats_example.sam4e_ek" value="Add" config="" content-id="Atmel.ASF" />
         <board id="board.sam4e_ek" value="Add" config="" content-id="Atmel.ASF" />

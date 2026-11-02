@@ -95,6 +95,7 @@ typedef struct
 	U8 arm_inputs;			// bitwise operations for inputs selected.			
 	U8 ip_monitor_f[MAX_INPUTS];
 	U8 delay_monitor_f[MAX_INPUTS];
+	U8 safety_monitor_f[MAX_INPUTS];
 }SAFETY_INTRUDER;
 
 extern U8 gb_ip_send_to_srver_f;

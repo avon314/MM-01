@@ -1008,6 +1008,26 @@ void Safety_And_Intruder_Monitor(void)
 	Monitor_ARM_Input();		// Monitor ARM/DISARM hardware input
 	for (U8 ip_num = 0; ip_num < MAX_INPUTS; ip_num++)	// Loop through all inputs
 	{
+		if ((ip_state[ip_num].current_state == IP_ACTIVE)	// Input active
+		&&(gb_input[ip_num].ip_type == ITYPE_SAFETY)
+		&&(intruder.safety_monitor_f[ip_num] == 0))
+		{
+			intruder.safety_monitor_f[ip_num] = 1;
+			intruder.start_alarm_delay_f = 1;
+			intruder.alarm_del_counter = 0;		// Reset alarm delay counter
+			intruder.alarm_del_exceed_f = 0;	// Clear alarm exceed flag
+			lcl_secs = 0;						// Reset seconds counter
+			Output_Operations_From_Server(intruder.op_number, ACTIVE);
+		}
+		else if ((ip_state[ip_num].current_state == IP_NOT_ACTIVE)	// Input active
+		&&(gb_input[ip_num].ip_type == ITYPE_SAFETY)
+		&&(intruder.safety_monitor_f[ip_num] == 1))
+		{
+			intruder.safety_monitor_f[ip_num] = 0;
+		}
+		else
+		__NOP();	// No operation
+		
 		if ((intruder.arm_status == ARMED)/* && (intruder.arm_monitor_f == 0)*/)	// System armed check
 		{
 			if (intruder.arm_monitor_f == 0)	// First ARM detection
