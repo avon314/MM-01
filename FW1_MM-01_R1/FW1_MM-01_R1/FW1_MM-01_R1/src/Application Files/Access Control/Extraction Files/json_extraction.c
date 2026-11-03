@@ -1043,6 +1043,12 @@ void Extract_WR_Data_From_JSON(struct json_token token)
 	uint8_t elem_index = 0;
 	char buf[32];
 
+	/* "WR":[DPN, Value, StartBit, StopBit] - start / stop bit used only for FC06 */
+	gb_mb_write_req.value       = 0;
+	gb_mb_write_req.start_bit   = 0;
+	gb_mb_write_req.stop_bit    = 0;
+	gb_mb_write_req.bit_range_f = 0;
+
 	while (json_scanf_array_elem(token.ptr, token.len, "", elem_index, &array_elements) > 0)
 	{
 		wdt_restart(WDT);	// Restart the watch dog timer. Otherwise controller will restart.
@@ -1059,24 +1065,36 @@ void Extract_WR_Data_From_JSON(struct json_token token)
 		}
 		else if (elem_index == 1)
 		{
-			/* VALUE : HEX string ? 2-byte register */
-			uint16_t value = (uint16_t)strtol(buf, NULL, 16);
+			/* VALUE : HEX string, full value kept for FC06 bit range check */
+			uint32_t value = (uint32_t)strtoul(buf, NULL, 16);
 
+			gb_mb_write_req.value    = value;
 			gb_mb_write_req.data[0]  = (value >> 8) & 0xFF;  // MSB
 			gb_mb_write_req.data[1]  = value & 0xFF;         // LSB
+		}
+		else if (elem_index == 2)
+		{
+			/* START BIT : decimal, 0 = LSB */
+			gb_mb_write_req.start_bit = (U8)atoi(buf);
+		}
+		else if (elem_index == 3)
+		{
+			/* STOP BIT : decimal, max 15 */
+			gb_mb_write_req.stop_bit    = (U8)atoi(buf);
+			gb_mb_write_req.bit_range_f = 1;
 		}
 
 		elem_index++;
 	}
-	
-	Print_Message("\nTwo Bytes Modbus value for DPT : ");
+
+	Print_Message("\nModbus write for DPT : ");
 	Print_Number(gb_mb_write_req.dpt_num);
-	Print_Message(" is  ");
-	for(U8 i = 0; i < 2; i++)
-	{
-		Print_Number(gb_mb_write_req.data[i]);
-		Print_Message(",");
-	}
+	Print_Message(" Value : ");
+	Print_Number(gb_mb_write_req.value);
+	Print_Message(" Start bit : ");
+	Print_Number(gb_mb_write_req.start_bit);
+	Print_Message(" Stop bit : ");
+	Print_Number(gb_mb_write_req.stop_bit);
 	gb_write_to_req_f = 1;
 	/*Write_to_Register_Functionality(do_ix, lcl_wr_state);*/
 }

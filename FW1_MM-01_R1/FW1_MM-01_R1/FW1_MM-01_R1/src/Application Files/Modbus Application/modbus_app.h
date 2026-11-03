@@ -75,7 +75,11 @@ extern MS ms_info;                                                          // M
 typedef struct
 {
 	U8  dpt_num;                                                            // Data packet number to write
-	U8  data[2];                                                            // Data buffer for write operation
+	U8  data[2];                                                            // Value, 2 bytes MSB first (FC05 / FC15)
+	U32 value;                                                              // Value as received (FC06 bit range check)
+	U8  start_bit;                                                          // FC06 : first bit to change (0 = LSB)
+	U8  stop_bit;                                                           // FC06 : last bit to change (max 15)
+	U8  bit_range_f;                                                        // 1 = start and stop bit received in "WR"
 } mb_write_req_t;
 
 volatile extern mb_write_req_t gb_mb_write_req;                            // Modbus write request structure

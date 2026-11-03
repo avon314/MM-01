@@ -65,6 +65,8 @@ typedef struct
 	U8  fun_code;                                                           // Configured write function code (5, 6)
 	U8  data_len;                                                           // Configured data length (0/1 = 1 byte, 2/3 = 2 bytes written)
 	U8  value[2];                                                           // 2 bytes received from server (MSB, LSB)
+	U16 bit_mask;                                                           // FC06 : bits to change (StartBit..StopBit)
+	U16 bit_value;                                                          // FC06 : value shifted to StartBit
 } mb_write_ctx_t;
 
 static mb_write_ctx_t gb_wr_ctx;                                            // Write operation in progress
@@ -996,6 +998,42 @@ void Write_to_Register_Functionality(U8 dpt_num,U8 *data_buf)
 	{
 		U8 dummy_buf[2] = {0};
 
+		if (mp_config.dp_mb_fun == 6)                                       // FC06 : validate start / stop bit and value
+		{
+			U8  lcl_width = 0;
+			U32 lcl_mask  = 0;
+
+			if ((gb_mb_write_req.bit_range_f == 0)                          // Start / stop bit missing
+			|| (gb_mb_write_req.start_bit > gb_mb_write_req.stop_bit)       // Invalid range
+			|| (gb_mb_write_req.stop_bit > 15))                             // Outside 16 bit register
+			{
+				#if (DEBUG_ALL || DEBUG_MODBUS_DATA || DEBUG_WR_DATA)
+				Print_Message("\nWrite rejected : invalid start / stop bit");
+				#endif
+				Record_Modbus_Write_Status(mp_config.dp_slave_addr, 0x03); // Illegal data value in "ME"
+				return;
+			}
+
+			lcl_width = (gb_mb_write_req.stop_bit - gb_mb_write_req.start_bit) + 1;
+			lcl_mask  = (lcl_width == 16) ? 0xFFFF : ((1UL << lcl_width) - 1);
+
+			if (gb_mb_write_req.value > lcl_mask)                           // Value does not fit in bit range
+			{
+				#if (DEBUG_ALL || DEBUG_MODBUS_DATA || DEBUG_WR_DATA)
+				Print_Message("\nWrite rejected : value too large for bit range");
+				#endif
+				Record_Modbus_Write_Status(mp_config.dp_slave_addr, 0x03); // Illegal data value in "ME"
+				return;
+			}
+
+			gb_wr_ctx.bit_mask  = (U16)(lcl_mask << gb_mb_write_req.start_bit);
+			gb_wr_ctx.bit_value = (U16)(gb_mb_write_req.value << gb_mb_write_req.start_bit);
+		}
+		else
+		{
+			__NOP();
+		}
+
 		gb_wr_ctx.slave_addr = mp_config.dp_slave_addr;
 		gb_wr_ctx.reg_addr   = (U16)mp_config.dp_reg_addr;
 		gb_wr_ctx.fun_code   = mp_config.dp_mb_fun;
@@ -1648,9 +1686,8 @@ void Resume_DPT_Polling(void)
  *
  * Description	 : Handles the present value read before a write:
  *                 FC05 : coil read with FC01 is inverted and written.
- *                 FC06 : register read with FC03; data length 0/1 keeps the
- *                        high byte and writes the received low byte, data
- *                        length 2/3 writes the 2 received bytes.
+ *                 FC06 : register read with FC03; only bits StartBit..StopBit
+ *                        (from "WR") are changed, other bits are kept.
  *
  * Notes	     : Response from another slave / function or with short data
  *                 ends the write and resumes polling.
@@ -1677,15 +1714,15 @@ void Process_Write_Read_Response(void)
 		lcl_wr_buf[0] = (gb_rcv_str[3] & 0x01) ? 0x00 : 0xFF;               // ON -> 00 00, OFF -> FF 00
 		lcl_wr_buf[1] = 0x00;
 	}
-	else if ((gb_wr_ctx.data_len == 0) || (gb_wr_ctx.data_len == 1))        // FC06, 1 byte : keep high byte, change low byte
+	else                                                                    // FC06 : change only StartBit..StopBit
 	{
-		lcl_wr_buf[0] = gb_rcv_str[3];
-		lcl_wr_buf[1] = gb_wr_ctx.value[1];
-	}
-	else                                                                    // FC06, 2 / 4 byte : received 2 bytes to configured register
-	{
-		lcl_wr_buf[0] = gb_wr_ctx.value[0];
-		lcl_wr_buf[1] = gb_wr_ctx.value[1];
+		U16 lcl_reg = ((U16)gb_rcv_str[3] << 8) | gb_rcv_str[4];            // Present register value
+		
+		lcl_reg = (lcl_reg & (U16)(~gb_wr_ctx.bit_mask))                    // Keep bits outside the range
+		        | (gb_wr_ctx.bit_value & gb_wr_ctx.bit_mask);               // New bits inside the range
+		
+		lcl_wr_buf[0] = (U8)(lcl_reg >> 8);
+		lcl_wr_buf[1] = (U8)(lcl_reg & 0xFF);
 	}
 
 	#if (DEBUG_ALL || DEBUG_MODBUS_DATA || DEBUG_WR_DATA)
